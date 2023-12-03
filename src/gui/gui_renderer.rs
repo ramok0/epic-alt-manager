@@ -393,6 +393,7 @@ impl eframe::App for App {
                     .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
                         let font = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
+                        ui.add_space(5.);
                         centerer(ui, "_clone_controls",|ui| {
                   
                             ui.label(RichText::new("I want to clone controls from ").font(font.clone()).color(TEXT_COLOR));
@@ -435,13 +436,15 @@ impl eframe::App for App {
                                     }
                                 });
 
-                            ui.label(RichText::new("to ").font(font.clone()).color(TEXT_COLOR));
+                            ui.label(RichText::new("to").font(font.clone()).color(TEXT_COLOR));
 
                             ui.add(Label::new(RichText::new(information.swap_to).color(TEXT_COLOR).font(font.clone()).strong()));
                         });
 
                         let is_account_selected = self.clone_configuration_information.clone().unwrap().swap_from.is_some();
+                        ui.add_space(5.);
                             centerer(ui, "_buttons",|ui| {
+                     
                                 ui.add_enabled_ui(is_account_selected, |ui| {
                                     if add_button(ui, "Copy", EColor::Primary).clicked() {
                                         let info = self.clone_configuration_information.clone().unwrap();
@@ -475,6 +478,7 @@ impl eframe::App for App {
                     .title_bar(false)
                     .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
+                     
                         ui.style_mut().spacing.item_spacing.y += 10.0;
                         ui.style_mut().spacing.window_margin.bottom += 10.0;
                         ui.style_mut().spacing.window_margin.top += 10.0;
@@ -501,8 +505,9 @@ impl eframe::App for App {
                             });
     
                             ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
-    
+             
                             centerer(ui, "_link_account",|ui| {
+    
                                 if add_button(ui, "Link my account", EColor::Primary).clicked() {
                                     let url = data.verification_uri;
                                     let url_cstring = CString::new(url).expect(
