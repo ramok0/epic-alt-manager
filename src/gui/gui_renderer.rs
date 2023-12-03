@@ -338,7 +338,7 @@ impl eframe::App for App {
                
                         if ui.put(rect_configuration, 
                             egui::Image
-                            ::new(include_image!("../../assets/icons/gear.svg"))
+                            ::new(include_image!("../../assets/icons/clipboard.svg"))
                             .sense(Sense::click())
                             .tint(PRIMARY_COLOR)
                             .max_width(15.0)
