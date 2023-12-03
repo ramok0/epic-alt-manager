@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::egl::get_decryption_keys;
 use egui::{Color32, Rounding, Stroke, Style, Visuals};
-use gui::gui_constants::MODAL_COLOR;
+use gui::gui_constants::{MODAL_COLOR, TEXT_COLOR};
 
 mod config;
 mod decrypt;
@@ -54,6 +54,8 @@ fn main() {
             style.visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(0x58, 0x99, 0xff);
             style.visuals.widgets.inactive.rounding = Rounding::same(7.);
             style.visuals.widgets.hovered.rounding = Rounding::same(7.);
+
+            style.visuals.override_text_color = Some(TEXT_COLOR);
 
             style.spacing.window_margin.bottom = 10.;
             style.spacing.window_margin.top = 10.;

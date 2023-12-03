@@ -46,9 +46,9 @@ pub fn rich_montserrat_text(text: impl Into<String>, font_size: f32) -> RichText
     RichText::new(text).color(TEXT_COLOR).font(get_montserrat_font(font_size))
 }
 
-pub fn centerer(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {
+pub fn centerer(ui: &mut egui::Ui, id:impl std::hash::Hash, add_contents: impl FnOnce(&mut egui::Ui)) {
     ui.horizontal(|ui| {
-        let id = ui.id().with("_centerer");
+        let id = ui.id().with(id);
         let last_width: Option<f32> = ui.memory_mut(|mem| mem.data.get_temp(id));
         if let Some(last_width) = last_width {
             ui.add_space((ui.available_width() - last_width) / 2.0);
@@ -62,33 +62,6 @@ pub fn centerer(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {
         ui.memory_mut(|mem| mem.data.insert_temp(id, width));
 
         // Repaint if width changed
-        match last_width {
-            None => ui.ctx().request_repaint(),
-            Some(last_width) if last_width != width => ui.ctx().request_repaint(),
-            Some(_) => {}
-        }
-    });
-}
-
-pub fn center_with_element(ui: &mut egui::Ui, add_elements: impl FnOnce(&mut egui::Ui)) {
-    let id = ui.id().with("_center_with_elem");
-    let last_width: Option<f32> = ui.memory_mut(|mem| mem.data.get_temp(id));
-    dbg!(last_width);
-    ui.horizontal(|ui| {
-        if let Some(last_width) = last_width {
-            ui.add_space((ui.available_width() - last_width) / 2.0);
-        }
-
-        let response = ui
-            .scope(|ui| {
-                add_elements(ui);
-            })
-            .response;
-
-        let width = response.rect.width();
-        dbg!(&width);
-        ui.memory_mut(|mem| mem.data.insert_temp(id, width));
-
         match last_width {
             None => ui.ctx().request_repaint(),
             Some(last_width) if last_width != width => ui.ctx().request_repaint(),

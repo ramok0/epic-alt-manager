@@ -1,8 +1,6 @@
 use crate::config::Configuration;
 use crate::egl::{ get_remember_me_data, FORTNITE_NEW_SWITCH_GAME_CLIENT };
 use crate::epic::{ self, DeviceAuthorization, EpicError, EpicErrorKind };
-use crate::gui::gui_constants::MODAL_COLOR;
-use egui::epaint::Shadow;
 use egui_toast::{ Toast, ToastKind, ToastOptions, Toasts };
 use lazy_static::lazy_static;
 use std::ffi::CString;
@@ -29,7 +27,6 @@ use egui::{
     include_image,
     Align,
     Align2,
-    Button,
     CursorIcon,
     FontId,
     Label,
@@ -37,12 +34,6 @@ use egui::{
     RichText,
     Sense,
     Pos2,
-    Rounding,
-    Color32,
-    Stroke,
-    CentralPanel,
-    Margin,
-    Image,
 };
 use windows::core::PCSTR;
 use windows::Win32::UI::Shell::ShellExecuteA;
@@ -50,7 +41,6 @@ use windows::Win32::UI::Shell::ShellExecuteA;
 use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
 use super::gui_helper::{
     add_button,
-    center_with_element,
     centerer,
     create_button,
     rich_montserrat_text,
@@ -178,6 +168,7 @@ impl App {
                             *current_device_code = Some(AppDeviceAuthorization::from(device_code));
                         }
                     } else {
+                        let _ = device_code_tx.send(current_device_code.clone().map(|x| x.device_code)).await;
                         let device_code_content = current_device_code.clone().unwrap();
                         tokio::time::sleep(
                             std::time::Duration::from_secs(
@@ -233,6 +224,11 @@ impl App {
                             }
                         }
                     }
+                } else {
+                    let mut current_device_code = device_code_mtx.lock().await;
+                    if current_device_code.is_some() {
+                        *current_device_code = None;
+                    }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             }
@@ -279,7 +275,7 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.set_enabled(!IS_ADDING_ACCOUNT.load(Ordering::Relaxed));
+            ui.set_enabled(self.clone_configuration_information.is_none() && !IS_ADDING_ACCOUNT.load(Ordering::Relaxed));
 
             ui.vertical_centered(|ui| {
                 ui.add(
@@ -310,14 +306,15 @@ impl eframe::App for App {
                 ui.style_mut().spacing.item_spacing.y = 12.0;
                 let font_id = get_montserrat_font(FONT_SIZE);
 
+                let text_size = ui
+                .painter()
+                .layout_no_wrap(username.clone(), font_id.clone(), TEXT_COLOR)
+                .size();
+
+            let text_middle_screen = (ui.available_width() - text_size.x) / 2.0;
+
                 for account in self.accounts.clone() {
 
-                    let text_size = ui
-                        .painter()
-                        .layout_no_wrap(account.clone(), font_id.clone(), TEXT_COLOR)
-                        .size();
-
-                    let text_middle_screen = (ui.available_width() - text_size.x) / 2.0;
                     let screen_center: Pos2 = Pos2 { x: text_middle_screen, y: 50.0 };
 
                     let max_text = Pos2 {
@@ -351,16 +348,13 @@ impl eframe::App for App {
                                  swap_to: account.clone(),
                              });
                         }
-
               
                         if ui.put(
                             rect_text,
                             Label::new(rich_montserrat_text(account.clone(), FONT_SIZE).strong()).sense(Sense::click())
                         ).on_hover_cursor(CursorIcon::PointingHand).clicked() {
                             self.swap_account(account.clone());
-                        }        //         if response {
-                            //             self.swap_account(display_name.clone());
-                            //         }
+                        } 
 
                         let mut rect_delete = rect_text.clone();
 
@@ -384,78 +378,8 @@ impl eframe::App for App {
                         {
                             self.remove_account(account.clone());
                         }
-              
-
                 }
             }
-
-            // for account in self.accounts.clone() {
-            //     let display_name = account.clone();
-
-            //     let horizontal_align_id = ui.id().with("_center_with_elem");
-            //     let text_height_id = ui.id().with("_center_text_and_svgs");
-
-            //     let last_width: Option<f32> = ui.memory_mut(|mem|
-            //         mem.data.get_temp(horizontal_align_id)
-            //     );
-            //     let last_text_height: Option<f32> = ui.memory_mut(|mem|
-            //         mem.data.get_temp(text_height_id)
-            //     );
-
-            //     ui.horizontal(|ui| {
-            //         if let Some(items_width) = last_width {
-            //             ui.add_space((ui.available_width() - items_width) / 2.0);
-            //         }
-
-            //         if let Some(text_height) = last_text_height {
-            //             let response = ui.put(
-            //                 egui::Rect { min: Pos2 { x: 10., y: 50. }, max: Pos2 { x: 30., y: 80. } },
-            //                 egui::Image
-            //                     ::new(include_image!("../../assets/icons/gear.svg"))
-            //                     .sense(Sense::click())
-            //                     .tint(PRIMARY_COLOR)
-            //                     .max_width(13.0)
-            //             );
-
-            //             let button_width = response.rect.width();
-
-            //             if response.on_hover_cursor(CursorIcon::PointingHand).clicked() {
-            //                 self.clone_configuration_information = Some(SwapAccountInformation {
-            //                     swap_from: None,
-            //                     swap_to: display_name.clone(),
-            //                 });
-            //             }
-            //         }
-
-            //         let response = ui.add_sized(
-            //             [135.0, 35.0],
-            //             Label::new(rich_montserrat_text(account, 15.0).strong()).sense(
-            //                 Sense::click()
-            //             )
-            //         );
-            //         let text_width = response.rect.width();
-            //         let text_height = response.rect.height();
-   
-
-            //         if
-            //             ui
-            //                 .add(
-            //                     egui::Image
-            //                         ::new(include_image!("../../assets/icons/trash.svg"))
-            //                         .sense(Sense::click())
-            //                         .tint(DELETE_COLOR)
-            //                         .max_width(13.0)
-            //                 )
-            //                 .on_hover_cursor(CursorIcon::PointingHand)
-            //                 .clicked()
-            //         {
-            //             self.remove_account(display_name.clone());
-            //         }
-
-            //         ui.memory_mut(|mem| mem.data.insert_temp(horizontal_align_id, text_width));
-            //         ui.memory_mut(|mem| mem.data.insert_temp(text_height_id, text_height));
-            //     });
-            // }
 
             if self.clone_configuration_information.is_some() {
                 let information = self.clone_configuration_information.clone().unwrap();
@@ -466,10 +390,12 @@ impl eframe::App for App {
                     .collapsible(false)
                     .movable(false)
                     .title_bar(true)
+                    .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
-                        centerer(ui, |ui| {
-                            ui.label("I want to clone controls from ");
-
+                        let font = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
+                        centerer(ui, "_clone_controls",|ui| {
+                  
+                            ui.label(RichText::new("I want to clone controls from ").font(font.clone()).color(TEXT_COLOR));
                             egui::ComboBox
                                 ::from_id_source("account selector")
                                 .selected_text(
@@ -509,11 +435,28 @@ impl eframe::App for App {
                                     }
                                 });
 
-                            ui.label(format!("to {}", information.swap_to));
+                            ui.label(RichText::new("to ").font(font.clone()).color(TEXT_COLOR));
+
+                            ui.add(Label::new(RichText::new(information.swap_to).color(TEXT_COLOR).font(font.clone()).strong()));
                         });
+
+                        let is_account_selected = self.clone_configuration_information.clone().unwrap().swap_from.is_some();
+                            centerer(ui, "_buttons",|ui| {
+                                ui.add_enabled_ui(is_account_selected, |ui| {
+                                    if add_button(ui, "Copy", EColor::Primary).clicked() {
+                                        let info = self.clone_configuration_information.clone().unwrap();
+                                        self.clone_settings(info.swap_from.unwrap(), info.swap_to);
+                                    }
+                                });
+
+                                if add_button(ui, "Cancel", EColor::Delete).clicked() {
+                                    self.clone_configuration_information = None;
+                                }
+                            });
+
                     });
             }
-            if self.device_code_clone.is_some() {
+            if IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
                 let text =
                     "Use this code to link your account to this application through epicgames.com/activate".to_string();
                 let font_id = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
@@ -536,59 +479,65 @@ impl eframe::App for App {
                         ui.style_mut().spacing.window_margin.bottom += 10.0;
                         ui.style_mut().spacing.window_margin.top += 10.0;
 
-                        let data = self.device_code_clone.clone().unwrap();
-
-                        ui.vertical_centered(|ui| {
-                            if
-                                ui
-                                    .add(
-                                        Label::new(
-                                            rich_montserrat_text(
-                                                data.user_code.clone(),
-                                                18.0
-                                            ).heading()
-                                        ).sense(Sense::click())
-                                    )
-                                    .on_hover_cursor(CursorIcon::PointingHand)
-                                    .clicked()
-                            {
-                                ui.output_mut(|x| {
-                                    x.copied_text = data.user_code.clone();
-                                });
-                            }
-                        });
-
-                        ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
-
-                        centerer(ui, |ui| {
-                            if add_button(ui, "Link my account", EColor::Primary).clicked() {
-                                let url = data.verification_uri;
-                                let url_cstring = CString::new(url).expect(
-                                    "Failed to convert url from String to CString"
-                                );
-                                unsafe {
-                                    ShellExecuteA(
-                                        windows::Win32::Foundation::HWND(0),
-                                        s!("open"),
-                                        PCSTR::from_raw(url_cstring.as_bytes_with_nul().as_ptr()),
-                                        s!(""),
-                                        s!(""),
-                                        SW_SHOW
-                                    );
+                        if let Some(data) = self.device_code_clone.clone() {
+                            ui.vertical_centered(|ui| {
+                                if
+                                    ui
+                                        .add(
+                                            Label::new(
+                                                rich_montserrat_text(
+                                                    data.user_code.clone(),
+                                                    18.0
+                                                ).heading()
+                                            ).sense(Sense::click())
+                                        )
+                                        .on_hover_cursor(CursorIcon::PointingHand)
+                                        .clicked()
+                                {
+                                    ui.output_mut(|x| {
+                                        x.copied_text = data.user_code.clone();
+                                    });
                                 }
-                            }
+                            });
+    
+                            ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
+    
+                            centerer(ui, "_link_account",|ui| {
+                                if add_button(ui, "Link my account", EColor::Primary).clicked() {
+                                    let url = data.verification_uri;
+                                    let url_cstring = CString::new(url).expect(
+                                        "Failed to convert url from String to CString"
+                                    );
+                                    unsafe {
+                                        ShellExecuteA(
+                                            windows::Win32::Foundation::HWND(0),
+                                            s!("open"),
+                                            PCSTR::from_raw(url_cstring.as_bytes_with_nul().as_ptr()),
+                                            s!(""),
+                                            s!(""),
+                                            SW_SHOW
+                                        );
+                                    }
+                                }
+    
+                                if add_button(ui, "Cancel", EColor::Delete).clicked() {
+                                    IS_ADDING_ACCOUNT.store(false, Ordering::Relaxed);
+                                    self.device_code_clone = None;
+                                }
+                            });
+                        } else {
+                            ui.vertical_centered(|ui| {
+                                ui.label(rich_montserrat_text("Please wait a second...", 15.));
+                            });
+                        }
 
-                            if add_button(ui, "Cancel", EColor::Delete).clicked() {
-                                IS_ADDING_ACCOUNT.store(false, Ordering::Relaxed);
-                                self.device_code_clone = None;
-                            }
-                        });
                     });
             }
 
             //action menu at the bottom of the app
             ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
-                ui.style_mut().spacing.item_spacing.y += 3.0;
+
+                ui.style_mut().spacing.item_spacing.y = 5.0;
 
                 if
                     self.current_account.is_some() &&
