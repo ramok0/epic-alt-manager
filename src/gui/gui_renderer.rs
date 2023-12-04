@@ -3,23 +3,13 @@ use crate::egl::{ get_remember_me_data, FORTNITE_NEW_SWITCH_GAME_CLIENT };
 use crate::epic::{ self, DeviceAuthorization, EpicError, EpicErrorKind };
 use egui_toast::{ Toast, ToastKind, ToastOptions, Toasts };
 use lazy_static::lazy_static;
-use std::ffi::CString;
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc::{ Receiver, Sender };
 use tokio::sync::Mutex;
-use windows::core::s;
-use windows::Win32::UI::WindowsAndMessaging::SW_SHOW;
-lazy_static! {
-    // static ref THREAD_CREATION_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-    // static ref THREAD_AUTHENTIFICATION_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-    // static ref THREAD_ADD_ACCOUNT_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-    // // flag qui va handle si le thread a ete crreer
-    // static ref CREATE_CODE_THREAD_CREATED: AtomicBool = AtomicBool::new(false);
-    // static ref AUTHENTIFICATION_THREAD_CREATED: AtomicBool = AtomicBool::new(false);
-    // static ref ADD_ACCOUNT_THREAD_CREATED: AtomicBool = AtomicBool::new(false);
 
+lazy_static! {
     static ref IS_ADDING_ACCOUNT: AtomicBool = AtomicBool::new(false);
 }
 
@@ -34,9 +24,10 @@ use egui::{
     RichText,
     Sense,
     Pos2,
+    Image,
+    Vec2,
+    OpenUrl,
 };
-use windows::core::PCSTR;
-use windows::Win32::UI::Shell::ShellExecuteA;
 
 use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
 use super::gui_helper::{
@@ -168,7 +159,9 @@ impl App {
                             *current_device_code = Some(AppDeviceAuthorization::from(device_code));
                         }
                     } else {
-                        let _ = device_code_tx.send(current_device_code.clone().map(|x| x.device_code)).await;
+                        let _ = device_code_tx.send(
+                            current_device_code.clone().map(|x| x.device_code)
+                        ).await;
                         let device_code_content = current_device_code.clone().unwrap();
                         tokio::time::sleep(
                             std::time::Duration::from_secs(
@@ -275,7 +268,10 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.set_enabled(self.clone_configuration_information.is_none() && !IS_ADDING_ACCOUNT.load(Ordering::Relaxed));
+            ui.set_enabled(
+                self.clone_configuration_information.is_none() &&
+                    !IS_ADDING_ACCOUNT.load(Ordering::Relaxed)
+            );
 
             ui.vertical_centered(|ui| {
                 ui.add(
@@ -283,14 +279,6 @@ impl eframe::App for App {
                         rich_montserrat_text("Smurf Manager", 22.0).strong().color(PRIMARY_COLOR)
                     )
                 );
-
-                ui.add_space(40.0);
-
-                // ui.add(
-                //     Label::new(
-                //         rich_montserrat_text("Accounts", 15.)
-                //     )
-                // )
             });
 
             let mut sorted_accounts = self.accounts.clone();
@@ -301,21 +289,21 @@ impl eframe::App for App {
             if let Some(username) = longest_account {
                 const FONT_SIZE: f32 = 15.0;
 
-                let mut y_offset = 10.0;
+                let base_y_offset = ui.available_height() / 5.0;
+                let mut y_offset = 0.0;
 
                 ui.style_mut().spacing.item_spacing.y = 12.0;
                 let font_id = get_montserrat_font(FONT_SIZE);
 
                 let text_size = ui
-                .painter()
-                .layout_no_wrap(username.clone(), font_id.clone(), TEXT_COLOR)
-                .size();
+                    .painter()
+                    .layout_no_wrap(username.clone(), font_id.clone(), TEXT_COLOR)
+                    .size();
 
-            let text_middle_screen = (ui.available_width() - text_size.x) / 2.0;
+                let text_middle_screen = (ui.available_width() - text_size.x) / 2.0;
 
                 for account in self.accounts.clone() {
-
-                    let screen_center: Pos2 = Pos2 { x: text_middle_screen, y: 50.0 };
+                    let screen_center: Pos2 = Pos2 { x: text_middle_screen, y: base_y_offset };
 
                     let max_text = Pos2 {
                         x: screen_center.x + text_size.x + ui.style().spacing.item_spacing.x,
@@ -331,53 +319,67 @@ impl eframe::App for App {
 
                     let mut rect_configuration = rect_text.clone();
 
-                    rect_configuration.min.x = screen_center.x - ui.style().spacing.item_spacing.x - 15.;
+                    rect_configuration.min.x =
+                        screen_center.x - ui.style().spacing.item_spacing.x - 15.0;
                     rect_configuration.max.x = screen_center.x - ui.style().spacing.item_spacing.x;
-                    rect_configuration.min.y += 1.;
-                    rect_configuration.max.y += 1.;                    
-               
-                        if ui.put(rect_configuration, 
-                            egui::Image
-                            ::new(include_image!("../../assets/icons/clipboard.svg"))
-                            .sense(Sense::click())
-                            .tint(PRIMARY_COLOR)
-                            .max_width(15.0)
-                        ).on_hover_cursor(CursorIcon::PointingHand).clicked(){
-                            self.clone_configuration_information = Some(SwapAccountInformation {
-                                 swap_from: None,
-                                 swap_to: account.clone(),
-                             });
-                        }
-              
-                        if ui.put(
-                            rect_text,
-                            Label::new(rich_montserrat_text(account.clone(), FONT_SIZE).strong()).sense(Sense::click())
-                        ).on_hover_cursor(CursorIcon::PointingHand).clicked() {
-                            self.swap_account(account.clone());
-                        } 
+                    rect_configuration.min.y += 1.0;
+                    rect_configuration.max.y += 1.0;
 
-                        let mut rect_delete = rect_text.clone();
+                    if
+                        ui
+                            .put(
+                                rect_configuration,
+                                egui::Image
+                                    ::new(include_image!("../../assets/icons/clipboard.svg"))
+                                    .sense(Sense::click())
+                                    .tint(PRIMARY_COLOR)
+                                    .max_width(15.0)
+                            )
+                            .on_hover_cursor(CursorIcon::PointingHand)
+                            .clicked()
+                    {
+                        self.clone_configuration_information = Some(SwapAccountInformation {
+                            swap_from: None,
+                            swap_to: account.clone(),
+                        });
+                    }
 
-                        rect_delete.min.x = rect_text.max.x + ui.style().spacing.item_spacing.x;
-                        rect_delete.max.x += ui.style().spacing.item_spacing.x + 15.;
-                        rect_delete.min.y += 1.5;
-                        rect_delete.max.y += 1.5;
-     
-                        if
-                            ui
-                                .put(
-                                    rect_delete,
-                                    egui::Image
-                                        ::new(include_image!("../../assets/icons/trash.svg"))
-                                        .sense(Sense::click())
-                                        .tint(DELETE_COLOR)
-                                        .max_width(15.0)
-                                )
-                                .on_hover_cursor(CursorIcon::PointingHand)
-                                .clicked()
-                        {
-                            self.remove_account(account.clone());
-                        }
+                    if
+                        ui
+                            .put(
+                                rect_text,
+                                Label::new(
+                                    rich_montserrat_text(account.clone(), FONT_SIZE).strong()
+                                ).sense(Sense::click())
+                            )
+                            .on_hover_cursor(CursorIcon::PointingHand)
+                            .clicked()
+                    {
+                        self.swap_account(account.clone());
+                    }
+
+                    let mut rect_delete = rect_text.clone();
+
+                    rect_delete.min.x = rect_text.max.x + ui.style().spacing.item_spacing.x;
+                    rect_delete.max.x += ui.style().spacing.item_spacing.x + 15.0;
+                    rect_delete.min.y += 1.5;
+                    rect_delete.max.y += 1.5;
+
+                    if
+                        ui
+                            .put(
+                                rect_delete,
+                                egui::Image
+                                    ::new(include_image!("../../assets/icons/trash.svg"))
+                                    .sense(Sense::click())
+                                    .tint(DELETE_COLOR)
+                                    .max_width(15.0)
+                            )
+                            .on_hover_cursor(CursorIcon::PointingHand)
+                            .clicked()
+                    {
+                        self.remove_account(account.clone());
+                    }
                 }
             }
 
@@ -393,10 +395,13 @@ impl eframe::App for App {
                     .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
                         let font = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
-                        ui.add_space(5.);
-                        centerer(ui, "_clone_controls",|ui| {
-                  
-                            ui.label(RichText::new("I want to clone controls from ").font(font.clone()).color(TEXT_COLOR));
+                        ui.add_space(5.0);
+                        centerer(ui, "_clone_controls", |ui| {
+                            ui.label(
+                                RichText::new("I want to clone controls from ")
+                                    .font(font.clone())
+                                    .color(TEXT_COLOR)
+                            );
                             egui::ComboBox
                                 ::from_id_source("account selector")
                                 .selected_text(
@@ -438,25 +443,35 @@ impl eframe::App for App {
 
                             ui.label(RichText::new("to").font(font.clone()).color(TEXT_COLOR));
 
-                            ui.add(Label::new(RichText::new(information.swap_to).color(TEXT_COLOR).font(font.clone()).strong()));
+                            ui.add(
+                                Label::new(
+                                    RichText::new(information.swap_to)
+                                        .color(TEXT_COLOR)
+                                        .font(font.clone())
+                                        .strong()
+                                )
+                            );
                         });
 
-                        let is_account_selected = self.clone_configuration_information.clone().unwrap().swap_from.is_some();
-                        ui.add_space(5.);
-                            centerer(ui, "_buttons",|ui| {
-                     
-                                ui.add_enabled_ui(is_account_selected, |ui| {
-                                    if add_button(ui, "Copy", EColor::Primary).clicked() {
-                                        let info = self.clone_configuration_information.clone().unwrap();
-                                        self.clone_settings(info.swap_from.unwrap(), info.swap_to);
-                                    }
-                                });
-
-                                if add_button(ui, "Cancel", EColor::Delete).clicked() {
-                                    self.clone_configuration_information = None;
+                        let is_account_selected = self.clone_configuration_information
+                            .clone()
+                            .unwrap()
+                            .swap_from.is_some();
+                        ui.add_space(5.0);
+                        centerer(ui, "_buttons", |ui| {
+                            ui.add_enabled_ui(is_account_selected, |ui| {
+                                if add_button(ui, "Copy", EColor::Primary).clicked() {
+                                    let info = self.clone_configuration_information
+                                        .clone()
+                                        .unwrap();
+                                    self.clone_settings(info.swap_from.unwrap(), info.swap_to);
                                 }
                             });
 
+                            if add_button(ui, "Cancel", EColor::Delete).clicked() {
+                                self.clone_configuration_information = None;
+                            }
+                        });
                     });
             }
             if IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
@@ -478,7 +493,6 @@ impl eframe::App for App {
                     .title_bar(false)
                     .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
-                     
                         ui.style_mut().spacing.item_spacing.y += 10.0;
                         ui.style_mut().spacing.window_margin.bottom += 10.0;
                         ui.style_mut().spacing.window_margin.top += 10.0;
@@ -503,28 +517,15 @@ impl eframe::App for App {
                                     });
                                 }
                             });
-    
+
                             ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
-             
-                            centerer(ui, "_link_account",|ui| {
-    
+
+                            centerer(ui, "_link_account", |ui| {
                                 if add_button(ui, "Link my account", EColor::Primary).clicked() {
                                     let url = data.verification_uri;
-                                    let url_cstring = CString::new(url).expect(
-                                        "Failed to convert url from String to CString"
-                                    );
-                                    unsafe {
-                                        ShellExecuteA(
-                                            windows::Win32::Foundation::HWND(0),
-                                            s!("open"),
-                                            PCSTR::from_raw(url_cstring.as_bytes_with_nul().as_ptr()),
-                                            s!(""),
-                                            s!(""),
-                                            SW_SHOW
-                                        );
-                                    }
+                                    ctx.open_url(OpenUrl { url, new_tab: true });
                                 }
-    
+
                                 if add_button(ui, "Cancel", EColor::Delete).clicked() {
                                     IS_ADDING_ACCOUNT.store(false, Ordering::Relaxed);
                                     self.device_code_clone = None;
@@ -532,16 +533,22 @@ impl eframe::App for App {
                             });
                         } else {
                             ui.vertical_centered(|ui| {
-                                ui.label(rich_montserrat_text("Please wait a second...", 15.));
+                                ui.label(rich_montserrat_text("Please wait a second...", 15.0));
                             });
                         }
-
                     });
             }
 
+            // ui.with_layout(Layout::right_to_left(Align::Max), |ui| {
+            //     ui.add(egui::Image
+            //         ::new(include_image!("../../assets/icons/gear.svg"))
+            //         .sense(Sense::click())
+            //         .tint(PRIMARY_COLOR)
+            //         .max_width(15.0));
+            // });
+
             //action menu at the bottom of the app
             ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
-
                 ui.style_mut().spacing.item_spacing.y = 5.0;
 
                 if
@@ -560,7 +567,7 @@ impl eframe::App for App {
                     }
                 }
 
-                if add_button(ui, "Kill EpicGamesLauncher", EColor::Primary).clicked() {
+                if add_button(ui, "Kill EGL", EColor::Primary).clicked() {
                     let result = Self::kill_epic_games_launcher().map(|_| {
                         Toast {
                             kind: ToastKind::Success,
@@ -581,7 +588,29 @@ impl eframe::App for App {
                 }
 
                 if !IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
-                    if add_button(ui, "Link another account", EColor::Primary).clicked() {
+                    // if add_button(ui, "Link another account", EColor::Primary).clicked() {
+                    //     IS_ADDING_ACCOUNT.store(true, Ordering::Relaxed);
+                    // }
+
+                    let window_pos = ui.input(|i| { i.viewport().inner_rect }).unwrap();
+
+                    let window_size = window_pos.max - window_pos.min;
+
+                    let plus_max = Vec2 { 
+                        x: window_size.x * 0.99, 
+                        y: window_size.y * 0.991
+                    };
+
+                    let plus_min = plus_max - Vec2 { x: 25.0, y: 25.0 };
+                    let vec_to_pos = |x: Vec2| -> Pos2 { Pos2 { x: x.x, y: x.y } };
+
+                    if ui.put(
+                        egui::Rect { min: vec_to_pos(plus_min), max: vec_to_pos(plus_max) },
+                        Image::new(include_image!("../../assets/icons/plus.svg"))
+                            .sense(Sense::click())
+                            .tint(PRIMARY_COLOR)
+                            .max_width(35.0)
+                    ).clicked() {
                         IS_ADDING_ACCOUNT.store(true, Ordering::Relaxed);
                     }
                 }
