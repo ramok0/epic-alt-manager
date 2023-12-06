@@ -60,6 +60,7 @@ pub struct DeviceAuth {
 }
 
 impl DeviceAuth {
+    //TODO : change the cipher algorithm with dpapi or AES
     pub fn cipher_secret(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.secret = self
             .secret
