@@ -93,7 +93,7 @@ impl RememberMeEntry {
 
 pub fn get_game_user_settings_path() -> std::io::Result<PathBuf> {
     let local_appdata = match env::var("localappdata") {
-        Ok(local_appdata) => local_appdata,
+        Ok(local_appdata) => Path::new(local_appdata),
         Err(_) => {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -102,17 +102,16 @@ pub fn get_game_user_settings_path() -> std::io::Result<PathBuf> {
         }
     };
 
-    let mut path = PathBuf::from(local_appdata);
-    path.push("EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini");
+    let game_user_settings_path = local_appdata.join("EpicGamesLauncher\\Saved\\Config\\Windows\\GameUserSettings.ini");
 
-    if !path.exists() {
+    if !game_user_settings_path.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "Failed to find GameUserSettings.ini",
         ));
     }
 
-    Ok(path)
+    Ok(game_user_settings_path)
 }
 
 pub(crate) fn get_game_user_settings_handle(path: &Path) -> std::io::Result<Ini> {
