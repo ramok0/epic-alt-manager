@@ -46,7 +46,7 @@ pub(crate) async fn link_egl_account_proc(
 
     Ok(Toast {
         kind: ToastKind::Info,
-        text: RichText::new(format!("Welcome back, {}", data.display_name.clone())).into(),
+        text: RichText::new(format!("Linked {} succesfully, you may have to reconnect on EpicGamesLauncher.", data.display_name.clone())).into(),
         options: ToastOptions::default()
             .duration_in_seconds(10.0)
             .show_progress(true)
@@ -71,22 +71,14 @@ pub(crate) async fn clone_settings_proc(
         .find(|x| x.display_name == clone_to_username);
 
     let check_account = |x: Option<&AccountDescriptor>| -> Result<(), EpicError> {
-        if x.is_none() {
-            return Err(EpicError::new(
-                EpicErrorKind::NotFound,
-                Some("Failed to find account"),
-            ));
-        }
-
-        if x.clone().unwrap().device_auth.is_none() {
-            return Err(EpicError::new(
-                EpicErrorKind::NotFound,
-                Some(format!(
-                    "Failed to find device_auth for account : {}",
-                    x.unwrap().display_name
-                )),
-            ));
-        }
+        x
+        .ok_or(
+            EpicError::new(EpicErrorKind::NotFound, Some("Failed to find account"))
+        )?
+        .device_auth
+        .ok_or(
+            EpicError::new(EpicErrorKind::NotFound, Some(format!("Failed to find device_auth for account : {}", x.display_name)))
+        )?;
 
         return Ok(());
     };
