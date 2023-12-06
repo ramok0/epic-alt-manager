@@ -112,7 +112,7 @@ impl AccountDescriptor {
     pub fn is_currently_used(&self) -> bool {
         match get_remember_me_data() {
             Ok(data) => {
-                println!("Self : {}, Data : {}", self.display_name, data.display_name);
+             //   println!("Self : {}, Data : {}", self.display_name, data.display_name);
 
                 return *self.display_name == data.display_name;
             }
