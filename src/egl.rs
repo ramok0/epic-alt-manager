@@ -93,7 +93,7 @@ impl RememberMeEntry {
 
 pub fn get_game_user_settings_path() -> std::io::Result<PathBuf> {
     let local_appdata = match env::var("localappdata") {
-        Ok(local_appdata) => Path::new(local_appdata),
+        Ok(local_appdata) => PathBuf::from(local_appdata),
         Err(_) => {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,

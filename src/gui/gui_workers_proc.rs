@@ -71,16 +71,25 @@ pub(crate) async fn clone_settings_proc(
         .find(|x| x.display_name == clone_to_username);
 
     let check_account = |x: Option<&AccountDescriptor>| -> Result<(), EpicError> {
-        x
-        .ok_or(
-            EpicError::new(EpicErrorKind::NotFound, Some("Failed to find account"))
-        )?
-        .device_auth
-        .ok_or(
-            EpicError::new(EpicErrorKind::NotFound, Some(format!("Failed to find device_auth for account : {}", x.display_name)))
-        )?;
+        //check if account exists and device_auth is not null, otherwise, return an EpicError
 
-        return Ok(());
+        if x.is_none() {
+            return Err(EpicError::new(
+                EpicErrorKind::NotFound,
+                Some("Failed to find account"),
+            ));
+        }
+
+        let account = x.unwrap();
+
+        if account.device_auth.is_none() {
+            return Err(EpicError::new(
+                EpicErrorKind::Other,
+                Some("Account has no device_auth"),
+            ));
+        }
+
+        Ok(())
     };
 
     check_account(clone_from_opt.clone())?;
