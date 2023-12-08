@@ -26,10 +26,10 @@ use egui::{
     Pos2,
     Image,
     Vec2,
-    OpenUrl, Button, Rounding, Color32,
+    OpenUrl, 
 };
 
-use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR, PRIMARY_COLOR_HOVER };
+use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
 use super::gui_helper::{
     add_button,
     centerer,
@@ -617,7 +617,7 @@ impl eframe::App for App {
 
                     let configuration_max = Vec2 {
                         x: plus_min.x * 0.98,
-                        y: plus_max.y-1.5
+                        y: plus_max.y-1.
                     };
 
 
@@ -625,7 +625,15 @@ impl eframe::App for App {
                      let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
 
         
+                    if ui.put(
+                        configuration_rect,
+                        Image::new(include_image!("../../assets/icons/gear.svg"))
+                        .sense(Sense::click())
+                        .tint(PRIMARY_COLOR)
+                        .max_width(25.0))
+                        .clicked() {
 
+                        }
                 }
             });
         });
