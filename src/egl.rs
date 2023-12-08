@@ -46,6 +46,7 @@ pub async fn get_decryption_keys() {
             if let Ok(body) = response.text().await {
                 if let Ok(data) = serde_json::from_str::<LegendaryResponse>(&body) {
                     let _ = DECRYPTION_KEYS.set(data.egl_config.data_keys);
+                    return ()
                 }
             }
         }
