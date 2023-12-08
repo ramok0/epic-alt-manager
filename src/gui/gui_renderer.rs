@@ -26,10 +26,10 @@ use egui::{
     Pos2,
     Image,
     Vec2,
-    OpenUrl,
+    OpenUrl, Button, Rounding, Color32,
 };
 
-use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
+use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR, PRIMARY_COLOR_HOVER };
 use super::gui_helper::{
     add_button,
     centerer,
@@ -588,9 +588,7 @@ impl eframe::App for App {
                 }
 
                 if !IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
-                    // if add_button(ui, "Link another account", EColor::Primary).clicked() {
-                    //     IS_ADDING_ACCOUNT.store(true, Ordering::Relaxed);
-                    // }
+                    //afficher le bouton pour ajouter un compte
 
                     let window_pos = ui.input(|i| { i.viewport().inner_rect }).unwrap();
 
@@ -604,15 +602,30 @@ impl eframe::App for App {
                     let plus_min = plus_max - Vec2 { x: 25.0, y: 25.0 };
                     let vec_to_pos = |x: Vec2| -> Pos2 { Pos2 { x: x.x, y: x.y } };
 
-                    if ui.put(
+        
+                    let response = ui.put(
                         egui::Rect { min: vec_to_pos(plus_min), max: vec_to_pos(plus_max) },
                         Image::new(include_image!("../../assets/icons/plus.svg"))
-                            .sense(Sense::click())
-                            .tint(PRIMARY_COLOR)
-                            .max_width(35.0)
-                    ).clicked() {
+                        .sense(Sense::click())
+                        .tint(PRIMARY_COLOR)
+                        .max_width(25.0)
+                    );
+
+                    if response.clicked() {
                         IS_ADDING_ACCOUNT.store(true, Ordering::Relaxed);
                     }
+
+                    let configuration_max = Vec2 {
+                        x: plus_min.x * 0.98,
+                        y: plus_max.y-1.5
+                    };
+
+
+                     let configuration_min = configuration_max - Vec2 { x: 25.0, y: 25.0 };
+                     let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
+
+        
+
                 }
             });
         });
