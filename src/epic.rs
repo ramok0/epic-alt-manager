@@ -60,6 +60,7 @@ pub struct DeviceAuth {
 }
 
 impl DeviceAuth {
+    //TODO : change the cipher algorithm with dpapi or AES
     pub fn cipher_secret(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.secret = self
             .secret
@@ -111,7 +112,7 @@ impl AccountDescriptor {
     pub fn is_currently_used(&self) -> bool {
         match get_remember_me_data() {
             Ok(data) => {
-                println!("Self : {}, Data : {}", self.display_name, data.display_name);
+             //   println!("Self : {}, Data : {}", self.display_name, data.display_name);
 
                 return *self.display_name == data.display_name;
             }
@@ -125,7 +126,7 @@ impl AccountDescriptor {
     pub async fn login_as_launcher(&self) -> Result<EpicAccount, EpicError> {
         let mut device_auth = self.device_auth.clone().ok_or(EpicError::new(
             EpicErrorKind::Other,
-            Some("Your configuration does not contains device_auth"),
+            Some("Your configuration does not contains a valid device_auth"),
         ))?;
 
         device_auth.uncipher_secret()?;
@@ -190,8 +191,11 @@ impl EpicAccount {
             .await?;
 
         if !response.status().is_success() {
-            eprintln!("Error : {}", response.status());
+            if cfg!(debug_assertions) {
+                eprintln!("Error : {}", response.status());
             eprintln!("Body : {}", response.text().await?);
+            }
+            
             return Err("Invalid response from API".into());
         }
 
