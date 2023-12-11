@@ -73,10 +73,7 @@ pub struct App {
     pub(crate) toasts: Toasts,
     accounts: Vec<String>,
     pub(crate) account_communication: (Sender<Vec<String>>, Receiver<Vec<String>>),
-    device_code_communication: (
-        Sender<Option<DeviceAuthorization>>,
-        Receiver<Option<DeviceAuthorization>>,
-    ),
+    device_code_communication: (Sender<Option<DeviceAuthorization>>, Receiver<Option<DeviceAuthorization>>),
     current_account: Option<String>,
     pub(crate) current_account_communication: (Sender<Option<String>>, Receiver<Option<String>>),
     pub(crate) toasts_communication: (Sender<Toast>, Receiver<Toast>),
@@ -632,7 +629,18 @@ impl eframe::App for App {
                         .tint(PRIMARY_COLOR)
                         .max_width(25.0))
                         .clicked() {
-
+                            self.toasts.add(
+                                Toast {
+                                    kind: ToastKind::Info,
+                                    text: egui::WidgetText::RichText(
+                                        RichText::new("This is not implemented yet")
+                                    ),
+                                    options: ToastOptions::default()
+                                        .duration_in_seconds(5.0)
+                                        .show_icon(true)
+                                        .show_progress(true),
+                                }
+                            );
                         }
                 }
             });
