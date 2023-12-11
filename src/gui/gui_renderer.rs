@@ -620,7 +620,6 @@ impl eframe::App for App {
                      let configuration_min = configuration_max - Vec2 { x: 25.0, y: 25.0 };
                      let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
 
-                    ui.painter().rect_filled(configuration_rect, Rounding::ZERO, Color32::RED);
 
                     if ui.put(
                         configuration_rect,
