@@ -26,7 +26,7 @@ use egui::{
     Pos2,
     Image,
     Vec2,
-    OpenUrl, 
+    OpenUrl, Rounding, Color32, 
 };
 
 use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
@@ -584,7 +584,6 @@ impl eframe::App for App {
                     });
                 }
 
-                if !IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
                     //afficher le bouton pour ajouter un compte
 
                     let window_pos = ui.input(|i| { i.viewport().inner_rect }).unwrap();
@@ -621,7 +620,8 @@ impl eframe::App for App {
                      let configuration_min = configuration_max - Vec2 { x: 25.0, y: 25.0 };
                      let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
 
-        
+                    ui.painter().rect_filled(configuration_rect, Rounding::ZERO, Color32::RED);
+
                     if ui.put(
                         configuration_rect,
                         Image::new(include_image!("../../assets/icons/gear.svg"))
@@ -642,7 +642,7 @@ impl eframe::App for App {
                                 }
                             );
                         }
-                }
+                
             });
         });
     }
