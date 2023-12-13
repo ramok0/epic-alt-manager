@@ -4,9 +4,11 @@ use crate::egl::{
     get_remember_me_data, RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2,
 };
 
+use base64::{engine::general_purpose, Engine};
 use egui_toast::{Toast, ToastOptions};
 use lazy_static::lazy_static;
 use reqwest::StatusCode;
+use windows::{Win32::Security::Cryptography::{CryptProtectData, CRYPT_INTEGER_BLOB, CRYPTPROTECT_LOCAL_MACHINE, CryptUnprotectData}, core::PCWSTR};
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::Client::new();
@@ -62,16 +64,67 @@ pub struct DeviceAuth {
 impl DeviceAuth {
     //TODO : change the cipher algorithm with dpapi or AES
     pub fn cipher_secret(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.secret = self
-            .secret
-            .chars()
-            .map(|x| (x as u8 ^ DEVICE_AUTH_SECRET_KEY) as char)
-            .collect();
+        let in_blob = CRYPT_INTEGER_BLOB {
+            cbData: self.secret.len() as u32,
+            pbData: self.secret.as_ptr() as *mut u8,
+        };
+        
+        let mut out_blob = unsafe { std::mem::zeroed::<CRYPT_INTEGER_BLOB>() };
 
+        unsafe {
+            CryptProtectData(
+                &in_blob,
+                PCWSTR::null(),
+                None,
+                None,
+                None,
+                CRYPTPROTECT_LOCAL_MACHINE,
+                &mut out_blob,
+            )
+        }?;
+
+        self.secret = general_purpose::STANDARD.encode(unsafe { 
+            std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize)
+        });
+        println!("Secret : {}", self.secret);
         Ok(())
     }
 
     pub fn uncipher_secret(&mut self) -> Result<(), EpicError> {
+        let raw_data = general_purpose::STANDARD.decode(self.secret.as_bytes()).map_err(|_| {
+            EpicError::new(
+                EpicErrorKind::CipherError,
+                Some("Failed to uncipher secret key"),
+            )
+        })?;
+
+        let in_blob = CRYPT_INTEGER_BLOB {
+            cbData: raw_data.len() as u32,
+            pbData: raw_data.as_ptr() as *mut u8,
+        };
+
+        let mut out_blob = unsafe { std::mem::zeroed::<CRYPT_INTEGER_BLOB>() };
+
+        unsafe {
+            CryptUnprotectData(
+                &in_blob,
+                None,
+                None,
+                None,
+                None,
+                CRYPTPROTECT_LOCAL_MACHINE,
+                &mut out_blob,
+            )
+        }.map_err(|_| EpicError::new(EpicErrorKind::CipherError, Some("Failed to uncipher secret key")))?;
+
+        self.secret = String::from_utf8(unsafe {
+            Vec::from_raw_parts(out_blob.pbData, out_blob.cbData as usize, out_blob.cbData as usize)
+        }).map_err(|_| EpicError::new(EpicErrorKind::CipherError, Some("Failed to decode secret key")))?;
+
+        Ok(())
+    }
+
+    pub fn uncipher_secret_xor(&mut self) -> Result<(), EpicError> {
         self.secret = self
             .secret
             .chars()

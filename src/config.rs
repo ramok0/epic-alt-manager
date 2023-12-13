@@ -10,6 +10,7 @@ use std::{
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct Configuration {
     pub accounts: Vec<AccountDescriptor>,
+    pub version:String
 }
 
 pub enum AddAccountProvider<'a> {
@@ -49,6 +50,28 @@ impl Configuration {
         Ok(configuration)
     }
 
+    fn update(&mut self) {
+        let version = self.version.to_string();
+        println!("version : {}", version);
+        match version.as_str() {
+            "0.1.0" => {
+                println!("Updating configuration from version 0.1.0 to 0.1.1");
+                self.accounts.iter_mut().for_each(|x| {
+                    if let Some(device_auth) = &mut x.device_auth {
+                        if let Ok(_) = device_auth.uncipher_secret_xor() {
+                            let _ = device_auth.cipher_secret();
+                        }
+                    }
+                });
+
+                let _ = self.flush();
+            }
+            _ => {}
+        }
+
+        self.version = crate::version::get_program_version().to_string();
+    }
+
     fn get_path() -> PathBuf {
         std::path::PathBuf::from("config.json")
     }
@@ -57,22 +80,29 @@ impl Configuration {
         Path::exists(&Configuration::get_path())
     }
 
-    fn apply_values(&mut self, data: Configuration) {
+    fn apply_values(&mut self, data: &Configuration) {
         self.accounts = data.accounts.clone();
+        self.version = data.version.clone();
     }
 
     fn read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+
+
         let path_buf = Configuration::get_path();
         if Configuration::exists() {
             let data_str = std::fs::read_to_string(path_buf)?;
             let data: Configuration = serde_json::from_str(&data_str)?;
 
-            self.apply_values(data);
+            self.apply_values(&data);
+
+            if data.version != crate::version::get_program_version() {
+                self.update();
+            }
         } else {
             let data = Self::default();
             data.flush()?;
 
-            self.apply_values(data);
+            self.apply_values(&data);
         }
 
         Ok(())
@@ -130,7 +160,7 @@ impl Configuration {
                     Err(_) => Err(AddAccountError::InvalidResponse),
                 }?;
 
-                if device_auth.uncipher_secret().is_err() {
+                if device_auth.cipher_secret().is_err() {
                     return Err(AddAccountError::CipherError);
                 }
 
@@ -190,6 +220,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Self {
             accounts: Vec::new(),
+            version: crate::version::get_program_version().to_string()
         }
     }
 }

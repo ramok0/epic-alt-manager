@@ -14,9 +14,9 @@ use super::{
 
 impl App {
     pub fn link_egl_account(&self) {
-        let tx = self.account_communication.0.clone();
+        let tx = self.data.account_communication.0.clone();
         let configuration_mtx = Arc::clone(&self.configuration);
-        let toast_communication = self.toasts_communication.0.clone();
+        let toast_communication = self.data.toasts_communication.0.clone();
         tokio::spawn(async move {
             let toast = link_egl_account_proc(configuration_mtx, tx)
                 .await
@@ -32,7 +32,7 @@ impl App {
         clone_to_username: impl Into<String>,
     ) {
         let configuration_mtx = Arc::clone(&self.configuration);
-        let toast_communication = self.toasts_communication.0.clone();
+        let toast_communication = self.data.toasts_communication.0.clone();
         let clone_from_username = clone_from_username.into();
         let clone_to_username = clone_to_username.into();
 
@@ -48,8 +48,8 @@ impl App {
 
     pub fn swap_account(&self, display_name: impl Into<String>) {
         let configuration_mtx = Arc::clone(&self.configuration);
-        let current_account_tx = self.current_account_communication.0.clone();
-        let toast_communication = self.toasts_communication.0.clone();
+        let current_account_tx = self.data.current_account_communication.0.clone();
+        let toast_communication = self.data.toasts_communication.0.clone();
 
         let display_name = display_name.into();
         tokio::spawn(async move {
@@ -67,8 +67,8 @@ impl App {
 
     pub fn remove_account(&self, display_name: impl Into<String>) {
         let configuration_mtx = Arc::clone(&self.configuration);
-        let accounts_tx = self.account_communication.0.clone();
-        let toast_communication = self.toasts_communication.0.clone();
+        let accounts_tx = self.data.account_communication.0.clone();
+        let toast_communication = self.data.toasts_communication.0.clone();
 
         let display_name = display_name.into();
         tokio::spawn(async move {

@@ -26,7 +26,7 @@ use egui::{
     Pos2,
     Image,
     Vec2,
-    OpenUrl, Rounding, Color32, 
+    OpenUrl,
 };
 
 use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
@@ -66,18 +66,34 @@ pub struct SwapAccountInformation {
     swap_to: String,
 }
 
-pub struct App {
-    pub(crate) configuration: Arc<Mutex<Configuration>>,
+pub struct DataManager {
     pub(crate) device_code_container: Arc<Mutex<Option<AppDeviceAuthorization>>>,
     pub(crate) device_code_clone: Option<DeviceAuthorization>,
-    pub(crate) toasts: Toasts,
-    accounts: Vec<String>,
     pub(crate) account_communication: (Sender<Vec<String>>, Receiver<Vec<String>>),
-    device_code_communication: (Sender<Option<DeviceAuthorization>>, Receiver<Option<DeviceAuthorization>>),
-    current_account: Option<String>,
+    pub(crate) device_code_communication: (Sender<Option<DeviceAuthorization>>, Receiver<Option<DeviceAuthorization>>),
     pub(crate) current_account_communication: (Sender<Option<String>>, Receiver<Option<String>>),
-    pub(crate) toasts_communication: (Sender<Toast>, Receiver<Toast>),
+    pub(crate) toasts_communication: (Sender<Toast>, Receiver<Toast>)
+}
+
+impl DataManager {
+    pub fn new() -> Self {
+        Self { device_code_container: Arc::new(Mutex::new(None)), 
+            device_code_clone: None, 
+            account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Vec<String>>()), 
+            device_code_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Option<DeviceAuthorization>>()), 
+            current_account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Option<String>>()), 
+            toasts_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Toast>()) }
+    }
+}
+
+pub struct App {
+    pub configuration: Arc<Mutex<Configuration>>,
+    pub data: DataManager,
+    pub toasts: Toasts,
+    accounts: Vec<String>,
+    current_account: Option<String>,
     clone_configuration_information: Option<SwapAccountInformation>,
+    advanced_mode: bool
 }
 
 impl App {
@@ -91,25 +107,17 @@ impl App {
 
         let mut app = Self {
             configuration: Arc::new(Mutex::new(configuration)),
-            device_code_clone: None,
-            device_code_container: Arc::new(Mutex::new(None)),
+            data: DataManager::new(),
             accounts: accounts
                 .iter()
                 .map(|x| x.display_name.clone())
                 .collect(),
-            account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Vec<String>>()),
-            device_code_communication: tokio::sync::mpsc::channel(
-                std::mem::size_of::<DeviceAuthorization>()
-            ),
             current_account: None,
-            current_account_communication: tokio::sync::mpsc::channel(
-                std::mem::size_of::<String>()
-            ),
             toasts: Toasts::new()
                 .anchor(Align2::RIGHT_BOTTOM, (-5.0, -5.0))
                 .direction(egui::Direction::BottomUp),
-            toasts_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Toast>()),
             clone_configuration_information: None,
+            advanced_mode: false
         };
 
         match get_remember_me_data() {
@@ -134,11 +142,11 @@ impl App {
     }
 
     fn auth_thread(&self) {
-        let device_code_mtx = Arc::clone(&self.device_code_container);
+        let device_code_mtx = Arc::clone(&self.data.device_code_container);
         let configuration_mtx = Arc::clone(&self.configuration);
-        let account_tx = self.account_communication.0.clone();
-        let device_code_tx = self.device_code_communication.0.clone();
-        let toast_communication = self.toasts_communication.0.clone();
+        let account_tx = self.data.account_communication.0.clone();
+        let device_code_tx = self.data.device_code_communication.0.clone();
+        let toast_communication = self.data.toasts_communication.0.clone();
 
         tokio::spawn(async move {
             loop {
@@ -248,19 +256,19 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.toasts.show(ctx);
 
-        if let Ok(toast) = self.toasts_communication.1.try_recv() {
+        if let Ok(toast) = self.data.toasts_communication.1.try_recv() {
             self.toasts.add(toast);
         }
 
-        if let Ok(new_accounts) = self.account_communication.1.try_recv() {
+        if let Ok(new_accounts) = self.data.account_communication.1.try_recv() {
             self.accounts = new_accounts;
         }
 
-        if let Ok(device_code) = self.device_code_communication.1.try_recv() {
-            self.device_code_clone = device_code;
+        if let Ok(device_code) = self.data.device_code_communication.1.try_recv() {
+            self.data.device_code_clone = device_code;
         }
 
-        if let Ok(current_account) = self.current_account_communication.1.try_recv() {
+        if let Ok(current_account) = self.data.current_account_communication.1.try_recv() {
             self.current_account = current_account;
         }
 
@@ -494,7 +502,7 @@ impl eframe::App for App {
                         ui.style_mut().spacing.window_margin.bottom += 10.0;
                         ui.style_mut().spacing.window_margin.top += 10.0;
 
-                        if let Some(data) = self.device_code_clone.clone() {
+                        if let Some(data) = self.data.device_code_clone.clone() {
                             ui.vertical_centered(|ui| {
                                 if
                                     ui
@@ -525,7 +533,7 @@ impl eframe::App for App {
 
                                 if add_button(ui, "Cancel", EColor::Delete).clicked() {
                                     IS_ADDING_ACCOUNT.store(false, Ordering::Relaxed);
-                                    self.device_code_clone = None;
+                                    self.data.device_code_clone = None;
                                 }
                             });
                         } else {

@@ -10,6 +10,7 @@ mod egl;
 mod epic;
 mod gui;
 mod process;
+mod version;
 
 use eframe::{egui, NativeOptions};
 use tokio::runtime::Runtime;
