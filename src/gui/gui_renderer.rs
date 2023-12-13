@@ -1,6 +1,6 @@
 use crate::config::Configuration;
 use crate::egl::{ get_remember_me_data, FORTNITE_NEW_SWITCH_GAME_CLIENT };
-use crate::epic::{ self, DeviceAuthorization, EpicError, EpicErrorKind };
+use crate::epic::{ self, DeviceAuthorization, EpicError, EpicErrorKind, TokenType, token_types };
 use egui_toast::{ Toast, ToastKind, ToastOptions, Toasts };
 use lazy_static::lazy_static;
 use std::sync::atomic::{ AtomicBool, Ordering };
@@ -10,7 +10,7 @@ use tokio::sync::mpsc::{ Receiver, Sender };
 use tokio::sync::Mutex;
 
 lazy_static! {
-    static ref IS_ADDING_ACCOUNT: AtomicBool = AtomicBool::new(false);
+    static ref IS_ADDING_DEVICE_CODE_ACCOUNT: AtomicBool = AtomicBool::new(false);
 }
 
 use egui::{
@@ -29,7 +29,7 @@ use egui::{
     OpenUrl,
 };
 
-use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
+use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR, MODAL_COLOR };
 use super::gui_helper::{
     add_button,
     centerer,
@@ -86,6 +86,8 @@ impl DataManager {
     }
 }
 
+
+
 pub struct App {
     pub configuration: Arc<Mutex<Configuration>>,
     pub data: DataManager,
@@ -93,7 +95,10 @@ pub struct App {
     accounts: Vec<String>,
     current_account: Option<String>,
     clone_configuration_information: Option<SwapAccountInformation>,
-    advanced_mode: bool
+    advanced_mode: bool,
+    configuration_menu: bool,
+    add_type:TokenType,
+    adding_account:bool,
 }
 
 impl App {
@@ -102,7 +107,7 @@ impl App {
         let accounts = configuration.accounts.clone();
 
         if accounts.len() == 0 {
-            IS_ADDING_ACCOUNT.store(true, Ordering::Relaxed);
+            IS_ADDING_DEVICE_CODE_ACCOUNT.store(true, Ordering::Relaxed);
         }
 
         let mut app = Self {
@@ -117,7 +122,10 @@ impl App {
                 .anchor(Align2::RIGHT_BOTTOM, (-5.0, -5.0))
                 .direction(egui::Direction::BottomUp),
             clone_configuration_information: None,
-            advanced_mode: false
+            advanced_mode: false,
+            configuration_menu: false,
+            add_type: TokenType::None,
+            adding_account: false
         };
 
         match get_remember_me_data() {
@@ -150,7 +158,7 @@ impl App {
 
         tokio::spawn(async move {
             loop {
-                if IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
+                if IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
                     let mut current_device_code = device_code_mtx.lock().await;
 
                     if
@@ -215,7 +223,7 @@ impl App {
                                 //disable account add
                                 *current_device_code = None;
                                 let _ = device_code_tx.send(None).await;
-                                IS_ADDING_ACCOUNT.store(false, Ordering::Relaxed);
+                                IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
                             }
                             Err(error) => {
                                 eprintln!("Failed to login into account : {}", error);
@@ -275,7 +283,9 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.set_enabled(
                 self.clone_configuration_information.is_none() &&
-                    !IS_ADDING_ACCOUNT.load(Ordering::Relaxed)
+                    !self.adding_account
+                    &&
+                    !self.configuration_menu
             );
 
             ui.vertical_centered(|ui| {
@@ -479,7 +489,7 @@ impl eframe::App for App {
                         });
                     });
             }
-            if IS_ADDING_ACCOUNT.load(Ordering::Relaxed) {
+            if self.adding_account {
                 let text =
                     "Use this code to link your account to this application through epicgames.com/activate".to_string();
                 let font_id = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
@@ -502,48 +512,101 @@ impl eframe::App for App {
                         ui.style_mut().spacing.window_margin.bottom += 10.0;
                         ui.style_mut().spacing.window_margin.top += 10.0;
 
-                        if let Some(data) = self.data.device_code_clone.clone() {
-                            ui.vertical_centered(|ui| {
-                                if
-                                    ui
-                                        .add(
-                                            Label::new(
-                                                rich_montserrat_text(
-                                                    data.user_code.clone(),
-                                                    18.0
-                                                ).heading()
-                                            ).sense(Sense::click())
-                                        )
-                                        .on_hover_cursor(CursorIcon::PointingHand)
-                                        .clicked()
-                                {
-                                    ui.output_mut(|x| {
-                                        x.copied_text = data.user_code.clone();
+                        if self.add_type == TokenType::DeviceCode {
+                            if !IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
+                                IS_ADDING_DEVICE_CODE_ACCOUNT.store(true, Ordering::Relaxed);
+                            }
+
+                            if let Some(data) = self.data.device_code_clone.clone() {
+                                ui.vertical_centered(|ui| {
+                                    if
+                                        ui
+                                            .add(
+                                                Label::new(
+                                                    rich_montserrat_text(
+                                                        data.user_code.clone(),
+                                                        18.0
+                                                    ).heading()
+                                                ).sense(Sense::click())
+                                            )
+                                            .on_hover_cursor(CursorIcon::PointingHand)
+                                            .clicked()
+                                    {
+                                        ui.output_mut(|x| {
+                                            x.copied_text = data.user_code.clone();
+                                        });
+                                    }
+                                });
+    
+                                ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
+    
+                                centerer(ui, "_link_account", |ui| {
+                                    if add_button(ui, "Link my account", EColor::Primary).clicked() {
+                                        let url = data.verification_uri;
+                                        ctx.open_url(OpenUrl { url, new_tab: true });
+                                    }
+    
+                                    if add_button(ui, "Cancel", EColor::Delete).clicked() {
+                                        IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
+                                        self.data.device_code_clone = None;
+                                        self.adding_account = false;
+                                    }
+                                });
+                            } else {
+                                ui.vertical_centered(|ui| {
+                                    ui.label(rich_montserrat_text("Please wait a second...", 15.0));
+                                });
+                            }
+                        }
+
+                        if self.advanced_mode {
+                            egui::ComboBox::from_label("Authentification method")
+                                .selected_text(format!("{:?}", self.add_type.to_string()))
+                                .show_ui(ui, |ui| {
+                                    token_types().iter().for_each(|x| {
+                                        ui.selectable_value(&mut self.add_type, *x, x.to_string());
                                     });
                                 }
-                            });
+                            );
 
-                            ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
+                            match self.add_type {
+                                TokenType::RefreshToken => {
+                                    ui.vertical_centered(|ui| {
+                                        ui.add(Label::new(rich_montserrat_text("Add account with Refresh Token", 14.)));
+                                    });
 
-                            centerer(ui, "_link_account", |ui| {
-                                if add_button(ui, "Link my account", EColor::Primary).clicked() {
-                                    let url = data.verification_uri;
-                                    ctx.open_url(OpenUrl { url, new_tab: true });
-                                }
+                                    ui.style_mut().visuals.extreme_bg_color = PRIMARY_COLOR;
 
-                                if add_button(ui, "Cancel", EColor::Delete).clicked() {
-                                    IS_ADDING_ACCOUNT.store(false, Ordering::Relaxed);
-                                    self.data.device_code_clone = None;
-                                }
-                            });
+                                    let mut s = String::new();
+                                    ui.text_edit_singleline(&mut s);
+                                },
+                                TokenType::AuthorizationCode => todo!(),
+                                TokenType::ExchangeCode => todo!(),
+                                TokenType::DeviceCode => todo!(),
+                               _ => {}
+                            }
                         } else {
-                            ui.vertical_centered(|ui| {
-                                ui.label(rich_montserrat_text("Please wait a second...", 15.0));
-                            });
+                            self.add_type = TokenType::DeviceCode;
                         }
                     });
             }
 
+            if self.configuration_menu {
+                egui::Window
+                ::new("Configuration")
+                .resizable(false)
+                .collapsible(false)
+                .movable(false)
+                .title_bar(true)
+                .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.checkbox(&mut self.advanced_mode, "Advanced mode");
+
+                    if ui.button("Close").clicked() {
+                        self.configuration_menu = false;
+                    }
+                });
+            }
             // ui.with_layout(Layout::right_to_left(Align::Max), |ui| {
             //     ui.add(egui::Image
             //         ::new(include_image!("../../assets/icons/gear.svg"))
@@ -616,7 +679,7 @@ impl eframe::App for App {
                     );
 
                     if response.clicked() {
-                        IS_ADDING_ACCOUNT.store(true, Ordering::Relaxed);
+                        self.adding_account = true;
                     }
 
                     let configuration_max = Vec2 {
@@ -648,6 +711,8 @@ impl eframe::App for App {
                                         .show_progress(true),
                                 }
                             );
+
+                            self.configuration_menu = true;
                         }
                 
             });

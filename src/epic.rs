@@ -444,6 +444,45 @@ impl EpicAccount {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenType {
+    RefreshToken,
+    AuthorizationCode,
+    ExchangeCode,
+
+    DeviceAuth,
+    DeviceCode,
+    None
+}
+
+pub fn token_types() -> [TokenType; 6] {
+    [
+        TokenType::RefreshToken,
+        TokenType::AuthorizationCode,
+        TokenType::ExchangeCode,
+        TokenType::DeviceAuth,
+        TokenType::DeviceCode,
+        TokenType::None
+    ]
+
+}
+
+impl Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            TokenType::RefreshToken => "RefreshToken",
+            TokenType::AuthorizationCode => "AuthorizationCode",
+            TokenType::ExchangeCode => "ExchangeCode",
+
+            TokenType::DeviceAuth => "DeviceAuth",
+            TokenType::DeviceCode => "DeviceCode",
+            TokenType::None => "None",
+        })?;
+
+        Ok(())
+    }
+}
+
 pub enum Token<'a> {
     RefreshToken(&'a str),
     #[allow(dead_code)]
