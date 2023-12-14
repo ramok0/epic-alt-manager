@@ -36,7 +36,7 @@ use super::gui_helper::{
     EColor,
     get_montserrat_font,
 };
-use super::window::{SubWindow, WindowSharedData, EventManager, EventKind, EWindow};
+use super::window::{SubWindow, WindowSharedData, EventManager, EventKind, EWindow, WindowManager};
 
 #[derive(Clone, Debug)]
 pub struct AppDeviceAuthorization {
@@ -77,31 +77,6 @@ impl DataManager {
             account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Vec<String>>()), 
             current_account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Option<String>>()), 
             toasts_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Toast>()) }
-    }
-}
-
-pub struct WindowManager {
-    pub current_window:Option<(EWindow, Box<dyn SubWindow>)>,
-}
-
-impl WindowManager {
-    pub fn new() -> Self {
-        Self { current_window: None }
-    }
-
-    pub fn render(&mut self, ctx:&egui::Context, ui:&mut egui::Ui) {
-        if self.current_window.is_some() {
-            self.current_window.as_mut().unwrap().1.render(ctx, ui);
-        }
-    }
-
-    pub fn set_window(&mut self, window:EWindow, shared_data:WindowSharedData) {
-        match window {
-            EWindow::AddAccount => {
-                self.current_window = Some((window, Box::new(AddAccountWindow::new(shared_data))));
-            },
-            _ => {}
-        }
     }
 }
 
