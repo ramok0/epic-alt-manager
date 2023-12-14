@@ -3,15 +3,14 @@ use crate::egl::{ get_remember_me_data, FORTNITE_NEW_SWITCH_GAME_CLIENT };
 use crate::epic::{ self, DeviceAuthorization, EpicError, EpicErrorKind, TokenType, token_types };
 use egui_toast::{ Toast, ToastKind, ToastOptions, Toasts };
 use lazy_static::lazy_static;
+use serde_json::Map;
+use std::collections::HashMap;
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc::{ Receiver, Sender };
 use tokio::sync::Mutex;
-
-lazy_static! {
-    static ref IS_ADDING_DEVICE_CODE_ACCOUNT: AtomicBool = AtomicBool::new(false);
-}
+use crate::gui::windows::add_account::AddAccountWindow;
 
 use egui::{
     include_image,
@@ -26,10 +25,9 @@ use egui::{
     Pos2,
     Image,
     Vec2,
-    OpenUrl,
 };
 
-use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR, MODAL_COLOR };
+use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
 use super::gui_helper::{
     add_button,
     centerer,
@@ -38,6 +36,7 @@ use super::gui_helper::{
     EColor,
     get_montserrat_font,
 };
+use super::window::{SubWindow, WindowSharedData, EventManager, EventKind, EWindow};
 
 #[derive(Clone, Debug)]
 pub struct AppDeviceAuthorization {
@@ -67,26 +66,44 @@ pub struct SwapAccountInformation {
 }
 
 pub struct DataManager {
-    pub(crate) device_code_container: Arc<Mutex<Option<AppDeviceAuthorization>>>,
-    pub(crate) device_code_clone: Option<DeviceAuthorization>,
     pub(crate) account_communication: (Sender<Vec<String>>, Receiver<Vec<String>>),
-    pub(crate) device_code_communication: (Sender<Option<DeviceAuthorization>>, Receiver<Option<DeviceAuthorization>>),
     pub(crate) current_account_communication: (Sender<Option<String>>, Receiver<Option<String>>),
     pub(crate) toasts_communication: (Sender<Toast>, Receiver<Toast>)
 }
 
 impl DataManager {
     pub fn new() -> Self {
-        Self { device_code_container: Arc::new(Mutex::new(None)), 
-            device_code_clone: None, 
+        Self {
             account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Vec<String>>()), 
-            device_code_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Option<DeviceAuthorization>>()), 
             current_account_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Option<String>>()), 
             toasts_communication: tokio::sync::mpsc::channel(std::mem::size_of::<Toast>()) }
     }
 }
 
+pub struct WindowManager {
+    pub current_window:Option<(EWindow, Box<dyn SubWindow>)>,
+}
 
+impl WindowManager {
+    pub fn new() -> Self {
+        Self { current_window: None }
+    }
+
+    pub fn render(&mut self, ctx:&egui::Context, ui:&mut egui::Ui) {
+        if self.current_window.is_some() {
+            self.current_window.as_mut().unwrap().1.render(ctx, ui);
+        }
+    }
+
+    pub fn set_window(&mut self, window:EWindow, shared_data:WindowSharedData) {
+        match window {
+            EWindow::AddAccount => {
+                self.current_window = Some((window, Box::new(AddAccountWindow::new(shared_data))));
+            },
+            _ => {}
+        }
+    }
+}
 
 pub struct App {
     pub configuration: Arc<Mutex<Configuration>>,
@@ -98,7 +115,10 @@ pub struct App {
     advanced_mode: bool,
     configuration_menu: bool,
     add_type:TokenType,
-    adding_account:bool,
+    pub adding_account:bool,
+
+    window_manager: WindowManager,
+    event_manager: EventManager,
 }
 
 impl App {
@@ -106,8 +126,10 @@ impl App {
         let configuration = Configuration::new().expect("Failed to load configuration");
         let accounts = configuration.accounts.clone();
 
+        let mut add_new_account = false;
+
         if accounts.len() == 0 {
-            IS_ADDING_DEVICE_CODE_ACCOUNT.store(true, Ordering::Relaxed);
+            add_new_account = true;
         }
 
         let mut app = Self {
@@ -125,7 +147,9 @@ impl App {
             advanced_mode: false,
             configuration_menu: false,
             add_type: TokenType::None,
-            adding_account: false
+            adding_account: add_new_account,
+            event_manager: tokio::sync::mpsc::channel(std::mem::size_of::<EventKind>()),
+            window_manager: WindowManager::new()
         };
 
         match get_remember_me_data() {
@@ -144,102 +168,102 @@ impl App {
             }
         }
 
-        app.auth_thread();
+     //   app.auth_thread();
 
         app
     }
 
-    fn auth_thread(&self) {
-        let device_code_mtx = Arc::clone(&self.data.device_code_container);
-        let configuration_mtx = Arc::clone(&self.configuration);
-        let account_tx = self.data.account_communication.0.clone();
-        let device_code_tx = self.data.device_code_communication.0.clone();
-        let toast_communication = self.data.toasts_communication.0.clone();
+    // fn auth_thread(&self) {
+    //     let device_code_mtx = Arc::clone(&self.data.device_code_container);
+    //     let configuration_mtx = Arc::clone(&self.configuration);
+    //     let account_tx = self.data.account_communication.0.clone();
+    //     let device_code_tx = self.data.device_code_communication.0.clone();
+    //     let toast_communication = self.data.toasts_communication.0.clone();
 
-        tokio::spawn(async move {
-            loop {
-                if IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
-                    let mut current_device_code = device_code_mtx.lock().await;
+    //     tokio::spawn(async move {
+    //         loop {
+    //             if IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
+    //                 let mut current_device_code = device_code_mtx.lock().await;
 
-                    if
-                        current_device_code.is_none() ||
-                        current_device_code.clone().unwrap().is_expired()
-                    {
-                        let new_device_code = Self::create_device_code().await;
+    //                 if
+    //                     current_device_code.is_none() ||
+    //                     current_device_code.clone().unwrap().is_expired()
+    //                 {
+    //                     let new_device_code = Self::create_device_code().await;
 
-                        if let Ok(device_code) = new_device_code {
-                            let _ = device_code_tx.send(Some(device_code.clone())).await;
-                            *current_device_code = Some(AppDeviceAuthorization::from(device_code));
-                        }
-                    } else {
-                        let _ = device_code_tx.send(
-                            current_device_code.clone().map(|x| x.device_code)
-                        ).await;
-                        let device_code_content = current_device_code.clone().unwrap();
-                        tokio::time::sleep(
-                            std::time::Duration::from_secs(
-                                device_code_content.device_code.interval as u64
-                            )
-                        ).await;
-                        let result = epic::token(
-                            epic::Token::DeviceCode(&device_code_content.device_code.device_code),
-                            FORTNITE_NEW_SWITCH_GAME_CLIENT
-                        ).await;
+    //                     if let Ok(device_code) = new_device_code {
+    //                         let _ = device_code_tx.send(Some(device_code.clone())).await;
+    //                         *current_device_code = Some(AppDeviceAuthorization::from(device_code));
+    //                     }
+    //                 } else {
+    //                     let _ = device_code_tx.send(
+    //                         current_device_code.clone().map(|x| x.device_code)
+    //                     ).await;
+    //                     let device_code_content = current_device_code.clone().unwrap();
+    //                     tokio::time::sleep(
+    //                         std::time::Duration::from_secs(
+    //                             device_code_content.device_code.interval as u64
+    //                         )
+    //                     ).await;
+    //                     let result = epic::token(
+    //                         epic::Token::DeviceCode(&device_code_content.device_code.device_code),
+    //                         FORTNITE_NEW_SWITCH_GAME_CLIENT
+    //                     ).await;
 
-                        match result {
-                            Ok(account) => {
-                                let mut configuration = configuration_mtx.lock().await;
-                                let add_account_result = configuration.add_account(
-                                    crate::config::AddAccountProvider::EpicAccount(&account)
-                                ).await;
+    //                     match result {
+    //                         Ok(account) => {
+    //                             let mut configuration = configuration_mtx.lock().await;
+    //                             let add_account_result = configuration.add_account(
+    //                                 crate::config::AddAccountProvider::EpicAccount(&account)
+    //                             ).await;
 
-                                if add_account_result.is_ok() {
-                                    let _ = toast_communication.send(Toast {
-                                        text: RichText::new(
-                                            format!(
-                                                "Added {} successfully",
-                                                account.display_name.clone().unwrap()
-                                            )
-                                        ).into(),
-                                        kind: ToastKind::Info,
-                                        options: ToastOptions::default()
-                                            .duration_in_seconds(10.0)
-                                            .show_progress(true)
-                                            .show_icon(true),
-                                    }).await;
-                                }
+    //                             if add_account_result.is_ok() {
+    //                                 let _ = toast_communication.send(Toast {
+    //                                     text: RichText::new(
+    //                                         format!(
+    //                                             "Added {} successfully",
+    //                                             account.display_name.clone().unwrap()
+    //                                         )
+    //                                     ).into(),
+    //                                     kind: ToastKind::Info,
+    //                                     options: ToastOptions::default()
+    //                                         .duration_in_seconds(10.0)
+    //                                         .show_progress(true)
+    //                                         .show_icon(true),
+    //                                 }).await;
+    //                             }
 
-                                if let Some(_display_name) = &account.display_name {
-                                    let _ = account_tx.send(
-                                        configuration.accounts
-                                            .iter()
-                                            .map(|x| x.display_name.clone())
-                                            .collect()
-                                    ).await;
-                                }
+    //                             if let Some(_display_name) = &account.display_name {
+    //                                 let _ = account_tx.send(
+    //                                     configuration.accounts
+    //                                         .iter()
+    //                                         .map(|x| x.display_name.clone())
+    //                                         .collect()
+    //                                 ).await;
+    //                             }
 
-                                let _ = configuration.flush();
+    //                             let _ = configuration.flush();
 
-                                //disable account add
-                                *current_device_code = None;
-                                let _ = device_code_tx.send(None).await;
-                                IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
-                            }
-                            Err(error) => {
-                                eprintln!("Failed to login into account : {}", error);
-                            }
-                        }
-                    }
-                } else {
-                    let mut current_device_code = device_code_mtx.lock().await;
-                    if current_device_code.is_some() {
-                        *current_device_code = None;
-                    }
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-            }
-        });
-    }
+    //                             //disable account add
+    //                             *current_device_code = None;
+    //                             let _ = device_code_tx.send(None).await;
+    //                             IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
+    //                         }
+    //                         Err(error) => {
+    //                             eprintln!("Failed to login into account : {}", error);
+    //                         }
+    //                     }
+    //                 }
+    //             } else {
+    //                 let mut current_device_code = device_code_mtx.lock().await;
+    //                 if current_device_code.is_some() {
+    //                     *current_device_code = None;
+    //                 }
+    //             }
+    //             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    //         }
+    //     });
+    // }
 
     pub async fn create_device_code() -> Result<DeviceAuthorization, EpicError> {
         let client_token = epic::token(
@@ -264,28 +288,24 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.toasts.show(ctx);
 
-        if let Ok(toast) = self.data.toasts_communication.1.try_recv() {
-            self.toasts.add(toast);
-        }
-
-        if let Ok(new_accounts) = self.data.account_communication.1.try_recv() {
-            self.accounts = new_accounts;
-        }
-
-        if let Ok(device_code) = self.data.device_code_communication.1.try_recv() {
-            self.data.device_code_clone = device_code;
-        }
-
-        if let Ok(current_account) = self.data.current_account_communication.1.try_recv() {
-            self.current_account = current_account;
+        if let Ok(event) = self.event_manager.1.try_recv() {
+            match event {
+                EventKind::Accounts(accounts) => {
+                    self.accounts = accounts;
+                },
+                EventKind::AddToast(toast) => {
+                    self.toasts.add(toast);
+                },
+                EventKind::CurrentAccount(account) => {
+                    self.current_account = account;
+                },
+            }
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.set_enabled(
-                self.clone_configuration_information.is_none() &&
-                    !self.adding_account
-                    &&
-                    !self.configuration_menu
+                //self.current_window.is_none() || !self.current_window.as_ref().unwrap().should_appear()
+                true
             );
 
             ui.vertical_centered(|ui| {
@@ -489,107 +509,113 @@ impl eframe::App for App {
                         });
                     });
             }
-            if self.adding_account {
-                let text =
-                    "Use this code to link your account to this application through epicgames.com/activate".to_string();
-                let font_id = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
+            // if self.adding_account {
+            //     let text =
+            //         "Use this code to link your account to this application through epicgames.com/activate".to_string();
+            //     let font_id = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
 
-                let text_size = ui
-                    .painter()
-                    .layout_no_wrap(text.clone(), font_id.clone(), TEXT_COLOR)
-                    .size();
+            //     let text_size = ui
+            //         .painter()
+            //         .layout_no_wrap(text.clone(), font_id.clone(), TEXT_COLOR)
+            //         .size();
 
-                egui::Window
-                    ::new("Add a new account")
-                    .resizable(false)
-                    .collapsible(false)
-                    .movable(false)
-                    .min_width(text_size.x)
-                    .title_bar(false)
-                    .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
-                    .show(ctx, |ui| {
-                        ui.style_mut().spacing.item_spacing.y += 10.0;
-                        ui.style_mut().spacing.window_margin.bottom += 10.0;
-                        ui.style_mut().spacing.window_margin.top += 10.0;
+            //     egui::Window
+            //         ::new("Add a new account")
+            //         .resizable(false)
+            //         .collapsible(false)
+            //         .movable(false)
+            //         .min_width(text_size.x)
+            //         .title_bar(false)
+            //         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+            //         .show(ctx, |ui| {
+            //             ui.style_mut().spacing.item_spacing.y += 10.0;
+            //             ui.style_mut().spacing.window_margin.bottom += 10.0;
+            //             ui.style_mut().spacing.window_margin.top += 10.0;
 
-                        if self.add_type == TokenType::DeviceCode {
-                            if !IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
-                                IS_ADDING_DEVICE_CODE_ACCOUNT.store(true, Ordering::Relaxed);
-                            }
+            //             if self.add_type == TokenType::DeviceCode {
+            //                 if !IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
+            //                     IS_ADDING_DEVICE_CODE_ACCOUNT.store(true, Ordering::Relaxed);
+            //                 }
 
-                            if let Some(data) = self.data.device_code_clone.clone() {
-                                ui.vertical_centered(|ui| {
-                                    if
-                                        ui
-                                            .add(
-                                                Label::new(
-                                                    rich_montserrat_text(
-                                                        data.user_code.clone(),
-                                                        18.0
-                                                    ).heading()
-                                                ).sense(Sense::click())
-                                            )
-                                            .on_hover_cursor(CursorIcon::PointingHand)
-                                            .clicked()
-                                    {
-                                        ui.output_mut(|x| {
-                                            x.copied_text = data.user_code.clone();
-                                        });
-                                    }
-                                });
+            //                 if let Some(data) = self.data.device_code_clone.clone() {
+            //                     ui.vertical_centered(|ui| {
+            //                         if
+            //                             ui
+            //                                 .add(
+            //                                     Label::new(
+            //                                         rich_montserrat_text(
+            //                                             data.user_code.clone(),
+            //                                             18.0
+            //                                         ).heading()
+            //                                     ).sense(Sense::click())
+            //                                 )
+            //                                 .on_hover_cursor(CursorIcon::PointingHand)
+            //                                 .clicked()
+            //                         {
+            //                             ui.output_mut(|x| {
+            //                                 x.copied_text = data.user_code.clone();
+            //                             });
+            //                         }
+            //                     });
     
-                                ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
+            //                     ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
     
-                                centerer(ui, "_link_account", |ui| {
-                                    if add_button(ui, "Link my account", EColor::Primary).clicked() {
-                                        let url = data.verification_uri;
-                                        ctx.open_url(OpenUrl { url, new_tab: true });
-                                    }
+            //                     centerer(ui, "_link_account", |ui| {
+            //                         if add_button(ui, "Link my account", EColor::Primary).clicked() {
+            //                             let url = data.verification_uri;
+            //                             ctx.open_url(OpenUrl { url, new_tab: true });
+            //                         }
     
-                                    if add_button(ui, "Cancel", EColor::Delete).clicked() {
-                                        IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
-                                        self.data.device_code_clone = None;
-                                        self.adding_account = false;
-                                    }
-                                });
-                            } else {
-                                ui.vertical_centered(|ui| {
-                                    ui.label(rich_montserrat_text("Please wait a second...", 15.0));
-                                });
-                            }
-                        }
+            //                         if add_button(ui, "Cancel", EColor::Delete).clicked() {
+            //                             IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
+            //                             self.data.device_code_clone = None;
+            //                             self.adding_account = false;
+            //                         }
+            //                     });
+            //                 } else {
+            //                     ui.vertical_centered(|ui| {
+            //                         ui.label(rich_montserrat_text("Please wait a second...", 15.0));
+            //                     });
+            //                 }
+            //             }
 
-                        if self.advanced_mode {
-                            egui::ComboBox::from_label("Authentification method")
-                                .selected_text(format!("{:?}", self.add_type.to_string()))
-                                .show_ui(ui, |ui| {
-                                    token_types().iter().for_each(|x| {
-                                        ui.selectable_value(&mut self.add_type, *x, x.to_string());
-                                    });
-                                }
-                            );
+            //             if self.advanced_mode {
+            //                 egui::ComboBox::from_label("Authentification method")
+            //                     .selected_text(format!("{:?}", self.add_type.to_string()))
+            //                     .show_ui(ui, |ui| {
+            //                         token_types().iter().for_each(|x| {
+            //                             ui.selectable_value(&mut self.add_type, *x, x.to_string());
+            //                         });
+            //                     }
+            //                 );
 
-                            match self.add_type {
-                                TokenType::RefreshToken => {
-                                    ui.vertical_centered(|ui| {
-                                        ui.add(Label::new(rich_montserrat_text("Add account with Refresh Token", 14.)));
-                                    });
+            //                 match self.add_type {
+            //                     TokenType::RefreshToken => {
+            //                         ui.vertical_centered(|ui| {
+            //                             ui.add(Label::new(rich_montserrat_text("Add account with Refresh Token", 14.)));
+            //                         });
 
-                                    ui.style_mut().visuals.extreme_bg_color = PRIMARY_COLOR;
+            //                         ui.style_mut().visuals.extreme_bg_color = PRIMARY_COLOR;
 
-                                    let mut s = String::new();
-                                    ui.text_edit_singleline(&mut s);
-                                },
-                                TokenType::AuthorizationCode => todo!(),
-                                TokenType::ExchangeCode => todo!(),
-                                TokenType::DeviceCode => todo!(),
-                               _ => {}
-                            }
-                        } else {
-                            self.add_type = TokenType::DeviceCode;
-                        }
-                    });
-            }
+            //                         let mut s = String::new();
+            //                         ui.text_edit_singleline(&mut s);
+            //                     },
+            //                     TokenType::AuthorizationCode => todo!(),
+            //                     TokenType::ExchangeCode => todo!(),
+            //                     TokenType::DeviceCode => todo!(),
+            //                    _ => {}
+            //                 }
+            //             } else {
+            //                 self.add_type = TokenType::DeviceCode;
+            //             }
+            //         });
+            // }
+
+            // if self.current_window.is_some() {
+            //     self.current_window.as_mut().unwrap().render(ctx, ui);
+            // }
+
+            self.window_manager.render(ctx, ui);
 
             if self.configuration_menu {
                 egui::Window
@@ -680,6 +706,15 @@ impl eframe::App for App {
 
                     if response.clicked() {
                         self.adding_account = true;
+                        // self.current_window = Some(Box::new(AddAccountWindow::new(ui, WindowSharedData {
+                        //     configuration: Arc::clone(&self.configuration),
+                        //     event_sender: self.event_manager.0.clone()
+                        // })));
+
+                        self.window_manager.set_window(EWindow::AddAccount, WindowSharedData {
+                            configuration: Arc::clone(&self.configuration),
+                            event_sender: self.event_manager.0.clone()
+                        });
                     }
 
                     let configuration_max = Vec2 {

@@ -232,7 +232,7 @@ pub struct EpicAccount {
 impl EpicAccount {
     pub async fn get_device_authorization(
         &self,
-    ) -> Result<DeviceAuthorization, Box<dyn std::error::Error>> {
+    ) -> Result<DeviceAuthorization, EpicError> {
         let mut body = HashMap::new();
         body.insert("prompt", "login");
 
@@ -241,18 +241,18 @@ impl EpicAccount {
             .form(&body)
             .bearer_auth(&self.access_token)
             .send()
-            .await?;
+            .await.map_err(|_| EpicError::reqwest_internal_error())?;
 
         if !response.status().is_success() {
-            if cfg!(debug_assertions) {
-                eprintln!("Error : {}", response.status());
-            eprintln!("Body : {}", response.text().await?);
-            }
+            // if cfg!(debug_assertions) {
+            //     eprintln!("Error : {}", response.status());
+            // eprintln!("Body : {}", response.text().await?);
+            // }
             
-            return Err("Invalid response from API".into());
+            return Err(EpicError::reqwest_error(response.status()));
         }
 
-        let authorization = response.json::<DeviceAuthorization>().await?;
+        let authorization = response.json::<DeviceAuthorization>().await.map_err(|_| EpicError::new(EpicErrorKind::ParsingError, Some("Failed to parse JSON data")))?;
 
         Ok(authorization)
     }
