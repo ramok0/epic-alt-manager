@@ -5,7 +5,7 @@ use tokio::sync::{mpsc::{Sender, Receiver}, Mutex};
 use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl, Order};
 use egui_toast::{Toast, ToastOptions};
 
-use crate::{gui::{window::{SubWindow, WindowSharedData}, gui_constants::TEXT_COLOR, gui_renderer::{App, AppDeviceAuthorization}, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError}, config::Configuration, egl::FORTNITE_NEW_SWITCH_GAME_CLIENT};
+use crate::{gui::{window::{SubWindow, WindowSharedData, EWindow}, gui_constants::TEXT_COLOR, gui_renderer::{App, AppDeviceAuthorization}, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError}, config::Configuration, egl::FORTNITE_NEW_SWITCH_GAME_CLIENT};
 
 #[derive(Debug, Default, Clone)]
 pub struct CredentialsBuffer {
@@ -35,7 +35,8 @@ pub struct AddAccountWindow {
     device_code_communication: (Sender<AppDeviceAuthorization>, Receiver<AppDeviceAuthorization>),
     shared_data:WindowSharedData,
     thread_state:Arc<Mutex<bool>>, //thread unique par window
-    should_close: bool
+    should_close: bool,
+    close_window_communication: (Sender<bool>, Receiver<bool>)
 }
 
 const MAIN_TEXT:&'static str = "Use this code to link your account to this application through epicgames.com/activate";
@@ -57,6 +58,7 @@ impl AddAccountWindow {
     pub fn device_code_manager(&self) -> () {
         let device_code_container = Arc::clone(&self.device_code_container);
         let device_code_communication = self.device_code_communication.0.clone();
+        let close_window_communication = self.close_window_communication.0.clone();
 
         let thread_state = self.thread_state.clone();
         let event_sender = self.shared_data.event_sender.clone();
@@ -117,6 +119,9 @@ impl AddAccountWindow {
                 let _ = event_sender.send(crate::gui::window::EventKind::Accounts(configuration.accounts.iter().map(|x| x.display_name.clone()).collect())).await;
                 let _ = configuration.flush();
 
+                let _ = close_window_communication.send(true).await;
+
+                break;
                 //disable account adding mode
            //     WANTS_TO_SHOW_ACCOUNT_WINDOW.store(false, Ordering::Relaxed);
             }
@@ -125,7 +130,7 @@ impl AddAccountWindow {
 }
 
 impl SubWindow for AddAccountWindow {
-    fn new(shared_data:WindowSharedData) -> Self where Self: Sized {
+    fn new(shared_data:WindowSharedData, _description:EWindow) -> Self where Self: Sized {
         //WANTS_TO_SHOW_ACCOUNT_WINDOW.store(true, Ordering::Relaxed);
         let font = FontId::new(14., egui::FontFamily::Name("Roboto".into()));
 
@@ -142,7 +147,8 @@ impl SubWindow for AddAccountWindow {
             device_code_communication: tokio::sync::mpsc::channel(std::mem::size_of::<AppDeviceAuthorization>()),
             shared_data,
             thread_state: Arc::new(Mutex::new(true)),
-            should_close: false
+            should_close: false,
+            close_window_communication: tokio::sync::mpsc::channel(1)
         };
 
         window.device_code_manager();
@@ -155,9 +161,9 @@ impl SubWindow for AddAccountWindow {
             self.device_code_clone = Some(device_code.device_code);
         }
 
-        if !self.should_appear() {
-            return;
-        }
+        if let Some(close_window) = self.close_window_communication.1.try_recv().ok() {
+            self.should_close = close_window;
+        } 
 
         self.create_window(ui).show(ctx, |ui| {
             // if self.add_type == TokenType::DeviceCode {

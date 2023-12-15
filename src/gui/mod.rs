@@ -7,4 +7,6 @@ pub mod window;
 
 mod windows {
     pub mod add_account;
+    pub mod clone_configuration;
+    pub mod settings;
 }

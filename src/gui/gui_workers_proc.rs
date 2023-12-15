@@ -9,9 +9,11 @@ use crate::{
     epic::{AccountDescriptor, EpicError, EpicErrorKind},
 };
 
+use super::window::{EventManager, EventKind, EventSender};
+
 pub(crate) async fn link_egl_account_proc(
     configuration_mtx: Arc<Mutex<Configuration>>,
-    accounts_tx: Sender<Vec<String>>,
+    event_sender: EventSender,
 ) -> Result<Toast, EpicError> {
     let data = get_remember_me_data().map_err(|_| {
         EpicError::new(
@@ -32,13 +34,13 @@ pub(crate) async fn link_egl_account_proc(
             )
         })?;
 
-    let _ = accounts_tx
+    let _ = event_sender
         .send(
-            configuration
+            EventKind::Accounts(configuration
                 .accounts
                 .iter()
                 .map(|x| x.display_name.clone())
-                .collect(),
+                .collect())
         )
         .await;
 
@@ -101,6 +103,10 @@ pub(crate) async fn clone_settings_proc(
     let clone_from_account = clone_from_device_auth.login().await?;
     let clone_to_account = clone_to_device_auth.login().await?;
 
+
+    let _ = clone_to_account.accept_eula().await;
+    let _ = clone_to_account.grant_access().await;
+
     let client_settings = clone_from_account
         .get_user_file_content("ClientSettings.Sav")
         .await?;
@@ -154,7 +160,7 @@ pub(crate) async fn swap_account_proc(
 
 pub async fn remove_account_proc(
     configuration_mtx: Arc<Mutex<Configuration>>,
-    accounts_tx: Sender<Vec<String>>,
+    event_sender: EventSender,
     display_name: String,
 ) -> Result<Toast, EpicError> {
     let mut configuration = configuration_mtx.lock().await;
@@ -169,13 +175,13 @@ pub async fn remove_account_proc(
     ))?;
 
     configuration.accounts.remove(position_opt.unwrap());
-    let _ = accounts_tx
+    let _ = event_sender
         .send(
-            configuration
+            EventKind::Accounts(configuration
                 .accounts
                 .iter()
                 .map(|x| x.display_name.clone())
-                .collect(),
+                .collect()),
         )
         .await;
     let _ = configuration.flush();

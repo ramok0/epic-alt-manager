@@ -219,6 +219,20 @@ impl EpicAccountDetails {
     }
 }
 
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct EULAData {
+    pub version: i64,
+    pub locale: String,
+    #[serde(skip)]
+    pub eula_pending: bool
+}
+
+pub enum EpicEula {
+    Accepted,
+    Pending(i64, String), //version, locale,
+    None
+}
+
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct EpicAccount {
     pub access_token: String,
@@ -230,6 +244,75 @@ pub struct EpicAccount {
 }
 
 impl EpicAccount {
+    pub async fn get_eula_data(&self) -> Result<EpicEula, EpicError> {
+        let response = CLIENT
+            .get(format!("https://eulatracking-public-service-prod-m.ol.epicgames.com/eulatracking/api/public/agreements/fn/account/{}", self.account_id.clone().unwrap()))
+            .bearer_auth(&self.access_token)
+            .send()
+            .await
+            .map_err(|_| EpicError::reqwest_internal_error())?;
+
+        match response.status() {
+            StatusCode::OK => {
+                let data = response.json::<EULAData>().await.map_err(|_| EpicError::new(EpicErrorKind::ParsingError, Some("Failed to parse JSON data")))?;
+
+                return Ok(EpicEula::Pending(data.version, data.locale));
+            },
+            StatusCode::NO_CONTENT => {
+                return Ok(EpicEula::Accepted)
+            },
+            _ => {
+                return Err(EpicError::reqwest_error(response.status()));
+            }
+        }
+    }
+
+    //get eula and accept it if its pending
+    pub async fn accept_eula(&self) -> EpicResult<()> 
+    {
+        let eula_data = self.get_eula_data().await?;
+
+        match eula_data {
+            EpicEula::Accepted => {
+                return Ok(());
+            },
+            EpicEula::Pending(version, locale) => {
+                let response = CLIENT
+                    .post(format!("https://eulatracking-public-service-prod-m.ol.epicgames.com/eulatracking/api/public/agreements/fn/version/{}/account/{}/accept?locale={}", version, self.account_id.clone().unwrap(), locale))
+                    .bearer_auth(&self.access_token)
+                    .send()
+                    .await
+                    .map_err(|_| EpicError::reqwest_internal_error())?;
+
+                if !response.status().is_success() {
+                    return Err(EpicError::reqwest_error(response.status()));
+                }
+
+                return Ok(());
+            },
+            EpicEula::None => {
+                return Err(EpicError::new(EpicErrorKind::Other, Some("Eula is not accepted and cannot be accepted")));
+            }
+        }
+    }
+
+    //grant account access to Fortnite using EpicGames api
+    pub async fn grant_access(&self) -> EpicResult<()> 
+    {
+        let response = CLIENT
+            .post(format!("https://fngw-mcp-gc-livefn.ol.epicgames.com/fortnite/api/game/v2/grant_access/{}", self.account_id.clone().unwrap()))
+            .bearer_auth(&self.access_token)
+            .send()
+            .await
+            .map_err(|_| EpicError::reqwest_internal_error())?;
+
+        if !response.status().is_success() {
+            return Err(EpicError::reqwest_error(response.status()));
+        }
+
+        return Ok(());
+    }
+
     pub async fn get_device_authorization(
         &self,
     ) -> Result<DeviceAuthorization, EpicError> {
@@ -581,6 +664,8 @@ impl Display for EpicError {
 }
 
 impl std::error::Error for EpicError {}
+
+type EpicResult<T> = Result<T, EpicError>;
 
 pub async fn token<'a>(
     token: Token<'a>,
