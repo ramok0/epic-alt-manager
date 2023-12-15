@@ -273,32 +273,30 @@ impl EpicAccount {
         let status = response.status();
 
         if status.is_success() {
-            let data = response.json::<Vec<FileEntry>>().await.map_err(|_| {
-                EpicError::new(
-                    EpicErrorKind::ParsingError,
-                    Some("Failed to parse request body"),
-                )
-            })?;
+            let data = response.json::<Vec<FileEntry>>().await.unwrap_or(Vec::new());
 
             return Ok(data);
         } else {
             //     println!("Response : {}", response.text().await.unwrap());
-
+            eprintln!("error while getting user files");
             return Err(EpicError::reqwest_error(status));
         }
     }
 
-    pub async fn create_file(&self, unique_file_name: impl Into<String>) -> Result<(), EpicError> {
+    pub async fn create_file(&self, unique_file_name: impl Into<String>, data:Vec<u8>) -> Result<(), EpicError> {
         let response = CLIENT
-        .get(format!("https://fngw-mcp-gc-livefn.ol.epicgames.com/fortnite/api/cloudstorage/user?filename={}", unique_file_name.into()))
+        .put(format!("https://fngw-mcp-gc-livefn.ol.epicgames.com/fortnite/api/cloudstorage/user/{}/{}",self.account_id.clone().unwrap(), unique_file_name.into()))
         .bearer_auth(&self.access_token)
+        .body(data)
         .send()
         .await.map_err(|_| EpicError::reqwest_internal_error())?;
 
         if response.status().is_success() {
             return Ok(());
         } else {
-            return Err(EpicError::reqwest_error(response.status()));
+            let status = response.status();
+            eprintln!("error while creating file, body : {}", response.text().await.unwrap());
+            return Err(EpicError::reqwest_error(status));
         }
     }
 
@@ -339,10 +337,12 @@ impl EpicAccount {
             .find(|x| x.unique_filename == file_name.clone())
             .is_none()
         {
-            self.create_file(file_name.clone()).await?;
+            self.create_file(file_name.clone(), data).await?;
+        } else {
+            self.update_file(file_name, data).await?;
         }
 
-        self.update_file(file_name, data).await?;
+
 
         Ok(())
     }
@@ -368,6 +368,7 @@ impl EpicAccount {
             })?;
             return Ok(bytes.to_vec());
         } else {
+            println!("error while getting file");
             return Err(EpicError::reqwest_error(response.status()));
         }
     }
@@ -449,7 +450,6 @@ pub enum TokenType {
     RefreshToken,
     AuthorizationCode,
     ExchangeCode,
-
     DeviceAuth,
     DeviceCode,
     None
