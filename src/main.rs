@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] 
+
 use std::time::Duration;
 
 use crate::egl::get_decryption_keys;
@@ -11,6 +13,8 @@ mod epic;
 mod gui;
 mod process;
 mod version;
+mod legendary;
+mod launchers;
 
 use eframe::{egui, NativeOptions};
 use tokio::runtime::Runtime;

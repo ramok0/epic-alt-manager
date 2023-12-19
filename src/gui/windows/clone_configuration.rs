@@ -6,7 +6,7 @@ pub struct CloneControlsData {
     pub clone_to: String,
 }
 
-use crate::gui::{window::{WindowSharedData, SubWindow, EWindow}, gui_helper::{centerer, add_button, EColor}, gui_constants::TEXT_COLOR, gui_workers_proc::clone_settings_proc};
+use crate::gui::{window::{WindowSharedData, SubWindow, EWindow, WindowDescriptor}, gui_helper::{centerer, add_button, EColor}, gui_constants::TEXT_COLOR, gui_workers_proc::clone_settings_proc};
 
 pub struct CloneControlsWindow {
     information:CloneControlsData,
@@ -15,9 +15,9 @@ pub struct CloneControlsWindow {
 }
 
 impl SubWindow for CloneControlsWindow {
-    fn new(shared_data:WindowSharedData, window_descriptor:EWindow) -> Self where Self: Sized {
+    fn new(shared_data:WindowSharedData, window_descriptor:WindowDescriptor) -> Self where Self: Sized {
         println!("created window");
-        match window_descriptor {
+        match window_descriptor.kind {
             EWindow::CloneSettings(info) => {
      
                 Self {

@@ -1,6 +1,6 @@
 use crate::{
     egl::{RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2},
-    epic::{self, AccountDescriptor, EpicAccount},
+    epic::{self, AccountDescriptor, EpicAccount}, launchers::Launchers,
 };
 use std::{
     fmt::Display,
@@ -10,6 +10,8 @@ use std::{
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct Configuration {
     pub accounts: Vec<AccountDescriptor>,
+    pub launcher:Launchers,
+    pub legendary_path:String,
     pub version:String
 }
 
@@ -82,6 +84,8 @@ impl Configuration {
 
     fn apply_values(&mut self, data: &Configuration) {
         self.accounts = data.accounts.clone();
+        self.launcher = data.launcher.clone();
+        self.legendary_path = data.legendary_path.clone();
         self.version = data.version.clone();
     }
 
@@ -220,6 +224,8 @@ impl Default for Configuration {
     fn default() -> Self {
         Self {
             accounts: Vec::new(),
+            launcher: Launchers::EpicGamesLauncher,
+            legendary_path:String::new(),
             version: crate::version::get_program_version().to_string()
         }
     }

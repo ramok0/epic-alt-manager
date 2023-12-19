@@ -5,7 +5,7 @@ use tokio::sync::{mpsc::Sender, Mutex};
 
 use crate::{
     config::Configuration,
-    egl::{self, get_remember_me_data},
+    egl::{self, epic_get_remember_me_data},
     epic::{AccountDescriptor, EpicError, EpicErrorKind},
 };
 
@@ -15,7 +15,7 @@ pub(crate) async fn link_egl_account_proc(
     configuration_mtx: Arc<Mutex<Configuration>>,
     event_sender: EventSender,
 ) -> Result<Toast, EpicError> {
-    let data = get_remember_me_data().map_err(|_| {
+    let data = epic_get_remember_me_data().map_err(|_| {
         EpicError::new(
             EpicErrorKind::Other,
             Some("Failed to get EGL account to config"),
@@ -142,7 +142,7 @@ pub(crate) async fn swap_account_proc(
     let account = descriptor.login_as_launcher().await?;
     let infos = account.get_infos().await?;
     let remember_me_entry = infos.to_remember_me_entry(&account.refresh_token.unwrap());
-    let _ = egl::set_remember_me_data(remember_me_entry)?;
+    let _ = egl::epic_set_remember_me_data(remember_me_entry)?;
 
     Ok(Toast {
         text: RichText::new(format!(

@@ -5,7 +5,7 @@ use tokio::sync::{mpsc::{Sender, Receiver}, Mutex};
 use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl, Order};
 use egui_toast::{Toast, ToastOptions};
 
-use crate::{gui::{window::{SubWindow, WindowSharedData, EWindow}, gui_constants::TEXT_COLOR, gui_renderer::{App, AppDeviceAuthorization}, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError}, config::Configuration, egl::FORTNITE_NEW_SWITCH_GAME_CLIENT};
+use crate::{gui::{window::{SubWindow, WindowSharedData, EWindow, WindowDescriptor}, gui_constants::TEXT_COLOR, gui_renderer::{App, AppDeviceAuthorization}, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError}, config::Configuration, egl::FORTNITE_NEW_SWITCH_GAME_CLIENT};
 
 #[derive(Debug, Default, Clone)]
 pub struct CredentialsBuffer {
@@ -130,7 +130,7 @@ impl AddAccountWindow {
 }
 
 impl SubWindow for AddAccountWindow {
-    fn new(shared_data:WindowSharedData, _description:EWindow) -> Self where Self: Sized {
+    fn new(shared_data:WindowSharedData, _description:WindowDescriptor) -> Self where Self: Sized {
         //WANTS_TO_SHOW_ACCOUNT_WINDOW.store(true, Ordering::Relaxed);
         let font = FontId::new(14., egui::FontFamily::Name("Roboto".into()));
 

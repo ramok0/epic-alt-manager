@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::egl::{
-    get_remember_me_data, RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2,
+    epic_get_remember_me_data, RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2,
 };
 
 use base64::{engine::general_purpose, Engine};
@@ -161,9 +161,8 @@ impl PartialEq for AccountDescriptor {
 }
 
 impl AccountDescriptor {
-    #[allow(dead_code)]
     pub fn is_currently_used(&self) -> bool {
-        match get_remember_me_data() {
+        match epic_get_remember_me_data() {
             Ok(data) => {
              //   println!("Self : {}, Data : {}", self.display_name, data.display_name);
 

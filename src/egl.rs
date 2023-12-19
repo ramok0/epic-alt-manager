@@ -74,7 +74,7 @@ pub struct RememberMeEntry {
 }
 
 impl RememberMeEntry {
-    pub fn to_base64_aes_ciphered(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn to_base64(&self) -> Result<String, Box<dyn std::error::Error>> {
         let data: Vec<RememberMeEntry> = vec![self.clone()];
 
         let json = serde_json::to_string(&data)?;
@@ -91,7 +91,7 @@ impl RememberMeEntry {
     // }
 }
 
-pub fn get_game_user_settings_path() -> std::io::Result<PathBuf> {
+pub fn epic_get_game_user_settings_path() -> std::io::Result<PathBuf> {
     let local_appdata = match env::var("localappdata") {
         Ok(local_appdata) => PathBuf::from(local_appdata),
         Err(_) => {
@@ -114,7 +114,7 @@ pub fn get_game_user_settings_path() -> std::io::Result<PathBuf> {
     Ok(game_user_settings_path)
 }
 
-pub(crate) fn get_game_user_settings_handle(path: &Path) -> std::io::Result<Ini> {
+pub(crate) fn epic_get_game_user_settings_handle(path: &Path) -> std::io::Result<Ini> {
     let ini_file: Ini = match Ini::load_from_file(path) {
         Ok(data) => data,
         Err(error) => {
@@ -129,10 +129,10 @@ pub(crate) fn get_game_user_settings_handle(path: &Path) -> std::io::Result<Ini>
     Ok(ini_file)
 }
 
-pub fn get_remember_me_raw_data() -> std::io::Result<String> {
-    let path = get_game_user_settings_path()?;
+pub fn epic_get_remember_me_raw_data() -> std::io::Result<String> {
+    let path = epic_get_game_user_settings_path()?;
 
-    let ini_file = get_game_user_settings_handle(&path)?;
+    let ini_file = epic_get_game_user_settings_handle(&path)?;
 
     if let Some(remember_me) = ini_file.section(Some("RememberMe")) {
         if let Some(enable) = remember_me.get("Enable") {
@@ -197,8 +197,8 @@ impl std::fmt::Display for GatherRememberMeDataError {
 
 impl std::error::Error for GatherRememberMeDataError {}
 
-pub fn get_remember_me_data() -> Result<RememberMeEntry, GatherRememberMeDataError> {
-    let base64_data = get_remember_me_raw_data().map_err(|_| GatherRememberMeDataError::IoError)?;
+pub fn epic_get_remember_me_data() -> Result<RememberMeEntry, GatherRememberMeDataError> {
+    let base64_data = epic_get_remember_me_raw_data().map_err(|_| GatherRememberMeDataError::IoError)?;
 
     if base64_data.len() == 0 {
         return Err(GatherRememberMeDataError::IoError);
@@ -233,22 +233,22 @@ pub fn get_remember_me_data() -> Result<RememberMeEntry, GatherRememberMeDataErr
     return Err(GatherRememberMeDataError::Unknown);
 }
 
-pub fn set_remember_me_data(entry: RememberMeEntry) -> Result<(), EpicError> {
-    let data = entry.to_base64_aes_ciphered().map_err(|_| {
+pub fn epic_set_remember_me_data(entry: RememberMeEntry) -> Result<(), EpicError> {
+    let data = entry.to_base64().map_err(|_| {
         EpicError::new(
             EpicErrorKind::EncodingError,
             Some("Failed to encode data to base64"),
         )
     })?;
 
-    let path = get_game_user_settings_path().map_err(|_| {
+    let path = epic_get_game_user_settings_path().map_err(|_| {
         EpicError::new(
             EpicErrorKind::IoError,
             Some("Failed to find GameUserSettings.ini path"),
         )
     })?;
 
-    let mut ini_file = get_game_user_settings_handle(&path).map_err(|_| {
+    let mut ini_file = epic_get_game_user_settings_handle(&path).map_err(|_| {
         EpicError::new(
             EpicErrorKind::IoError,
             Some("Failed to open GameUserSettings.ini"),

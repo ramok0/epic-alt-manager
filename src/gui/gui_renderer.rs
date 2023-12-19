@@ -1,10 +1,10 @@
-use crate::config::{Configuration, self};
-use crate::egl::{ get_remember_me_data, FORTNITE_NEW_SWITCH_GAME_CLIENT };
-use crate::epic::{ self, DeviceAuthorization, EpicError, EpicErrorKind };
+use crate::config::Configuration;
+use crate::egl::{ epic_get_remember_me_data };
+use crate::epic::DeviceAuthorization;
 use egui_toast::{ Toast, ToastKind, ToastOptions, Toasts };
+
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::mpsc::{ Receiver, Sender };
 use tokio::sync::Mutex;
 
 use egui::{
@@ -12,7 +12,6 @@ use egui::{
     Align,
     Align2,
     CursorIcon,
-    FontId,
     Label,
     Layout,
     RichText,
@@ -25,13 +24,12 @@ use egui::{
 use super::gui_constants::{ DELETE_COLOR, PRIMARY_COLOR, TEXT_COLOR };
 use super::gui_helper::{
     add_button,
-    centerer,
     create_button,
     rich_montserrat_text,
     EColor,
     get_montserrat_font,
 };
-use super::window::{SubWindow, WindowSharedData, EventManager, EventKind, EWindow, WindowManager};
+use super::window::{WindowSharedData, EventManager, EventKind, EWindow, WindowManager, WindowDescriptor};
 use super::windows::clone_configuration::CloneControlsData;
 use super::windows::settings::RuntimeSettings;
 
@@ -62,10 +60,7 @@ pub struct App {
     pub toasts: Toasts,
     accounts: Vec<String>,
     current_account: Option<String>,
-    clone_configuration_information: Option<CloneControlsData>,
-    advanced_mode: bool,
-    configuration_menu: bool,
-    pub runtime_settings:RuntimeSettings,
+    pub runtime_settings:Arc<std::sync::Mutex<RuntimeSettings>>,
     window_manager: WindowManager,
     pub event_manager: EventManager,
 }
@@ -85,23 +80,23 @@ impl App {
             toasts: Toasts::new()
                 .anchor(Align2::RIGHT_BOTTOM, (-5.0, -5.0))
                 .direction(egui::Direction::BottomUp),
-            clone_configuration_information: None,
-            advanced_mode: false,
-            configuration_menu: false,
-            runtime_settings: RuntimeSettings { advanced_mode: false },
+            runtime_settings: Arc::new(std::sync::Mutex::new(RuntimeSettings { advanced_mode: false })),
             event_manager: tokio::sync::mpsc::channel(std::mem::size_of::<EventKind>()),
             window_manager: WindowManager::new()
         };
 
         if accounts.len() == 0 {
-            app.window_manager.set_window(EWindow::AddAccount, WindowSharedData {
+            app.window_manager.set_window(WindowDescriptor {
+                kind: EWindow::AddAccount,
+                runtime_settings: Arc::clone(&app.runtime_settings)
+            }, WindowSharedData {
                 configuration: Arc::clone(&app.configuration),
                 event_sender: app.event_manager.0.clone(),
                 accounts: app.accounts.clone()
             });
         }
 
-        match get_remember_me_data() {
+        match epic_get_remember_me_data() {
             Ok(account) => {
                 app.current_account = Some(account.display_name.clone());
             }
@@ -116,103 +111,8 @@ impl App {
                 });
             }
         }
-
-     //   app.auth_thread();
-
         app
     }
-
-    // fn auth_thread(&self) {
-    //     let device_code_mtx = Arc::clone(&self.data.device_code_container);
-    //     let configuration_mtx = Arc::clone(&self.configuration);
-    //     let account_tx = self.data.account_communication.0.clone();
-    //     let device_code_tx = self.data.device_code_communication.0.clone();
-    //     let toast_communication = self.data.toasts_communication.0.clone();
-
-    //     tokio::spawn(async move {
-    //         loop {
-    //             if IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
-    //                 let mut current_device_code = device_code_mtx.lock().await;
-
-    //                 if
-    //                     current_device_code.is_none() ||
-    //                     current_device_code.clone().unwrap().is_expired()
-    //                 {
-    //                     let new_device_code = Self::create_device_code().await;
-
-    //                     if let Ok(device_code) = new_device_code {
-    //                         let _ = device_code_tx.send(Some(device_code.clone())).await;
-    //                         *current_device_code = Some(AppDeviceAuthorization::from(device_code));
-    //                     }
-    //                 } else {
-    //                     let _ = device_code_tx.send(
-    //                         current_device_code.clone().map(|x| x.device_code)
-    //                     ).await;
-    //                     let device_code_content = current_device_code.clone().unwrap();
-    //                     tokio::time::sleep(
-    //                         std::time::Duration::from_secs(
-    //                             device_code_content.device_code.interval as u64
-    //                         )
-    //                     ).await;
-    //                     let result = epic::token(
-    //                         epic::Token::DeviceCode(&device_code_content.device_code.device_code),
-    //                         FORTNITE_NEW_SWITCH_GAME_CLIENT
-    //                     ).await;
-
-    //                     match result {
-    //                         Ok(account) => {
-    //                             let mut configuration = configuration_mtx.lock().await;
-    //                             let add_account_result = configuration.add_account(
-    //                                 crate::config::AddAccountProvider::EpicAccount(&account)
-    //                             ).await;
-
-    //                             if add_account_result.is_ok() {
-    //                                 let _ = toast_communication.send(Toast {
-    //                                     text: RichText::new(
-    //                                         format!(
-    //                                             "Added {} successfully",
-    //                                             account.display_name.clone().unwrap()
-    //                                         )
-    //                                     ).into(),
-    //                                     kind: ToastKind::Info,
-    //                                     options: ToastOptions::default()
-    //                                         .duration_in_seconds(10.0)
-    //                                         .show_progress(true)
-    //                                         .show_icon(true),
-    //                                 }).await;
-    //                             }
-
-    //                             if let Some(_display_name) = &account.display_name {
-    //                                 let _ = account_tx.send(
-    //                                     configuration.accounts
-    //                                         .iter()
-    //                                         .map(|x| x.display_name.clone())
-    //                                         .collect()
-    //                                 ).await;
-    //                             }
-
-    //                             let _ = configuration.flush();
-
-    //                             //disable account add
-    //                             *current_device_code = None;
-    //                             let _ = device_code_tx.send(None).await;
-    //                             IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
-    //                         }
-    //                         Err(error) => {
-    //                             eprintln!("Failed to login into account : {}", error);
-    //                         }
-    //                     }
-    //                 }
-    //             } else {
-    //                 let mut current_device_code = device_code_mtx.lock().await;
-    //                 if current_device_code.is_some() {
-    //                     *current_device_code = None;
-    //                 }
-    //             }
-    //             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-    //         }
-    //     });
-    // }
 }
 
 impl eframe::App for App {
@@ -234,10 +134,10 @@ impl eframe::App for App {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.set_enabled(
-                //self.current_window.is_none() || !self.current_window.as_ref().unwrap().should_appear()
-                true
-            );
+
+            //disable window controls if a subwindow is opened and should render
+            let should_disable = self.window_manager.current_window.is_some() && self.window_manager.current_window.as_ref().unwrap().1.should_appear();
+            ui.set_enabled(!should_disable);
 
             ui.vertical_centered(|ui| {
                 ui.add(
@@ -304,15 +204,13 @@ impl eframe::App for App {
                             .on_hover_cursor(CursorIcon::PointingHand)
                             .clicked()
                     {
-                        // self.clone_configuration_information = Some(CloneControlsData {
-                        //     clone_from: None,
-                        //     clone_to: account.clone(),
-                        // });
-
-                        self.window_manager.set_window(EWindow::CloneSettings(CloneControlsData {
-                                 clone_from: None,
-                                 clone_to: account.clone(),
-                             }), WindowSharedData {
+                        self.window_manager.set_window(WindowDescriptor {
+                            kind: EWindow::CloneSettings(CloneControlsData {
+                                clone_from: None,
+                                clone_to: account.clone(),
+                            }),
+                            runtime_settings: self.runtime_settings.clone()
+                        }, WindowSharedData {
                                     configuration: Arc::clone(&self.configuration),
                                     event_sender: self.event_manager.0.clone(),
                                     accounts: self.accounts.clone()
@@ -358,231 +256,7 @@ impl eframe::App for App {
                 }
             }
 
-            // if self.clone_configuration_information.is_some() {
-            //     let information = self.clone_configuration_information.clone().unwrap();
-
-            //     egui::Window
-            //         ::new("Clone controls")
-            //         .resizable(false)
-            //         .collapsible(false)
-            //         .movable(false)
-            //         .title_bar(true)
-            //         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
-            //         .show(ctx, |ui| {
-            //             let font = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
-            //             ui.add_space(5.0);
-            //             centerer(ui, "_clone_controls", |ui| {
-            //                 ui.label(
-            //                     RichText::new("I want to clone controls from ")
-            //                         .font(font.clone())
-            //                         .color(TEXT_COLOR)
-            //                 );
-            //                 egui::ComboBox
-            //                     ::from_id_source("account selector")
-            //                     .selected_text(
-            //                         information.clone_from
-            //                             .clone()
-            //                             .unwrap_or(String::from("Select account"))
-            //                     )
-            //                     .show_ui(ui, |ui| {
-            //                         let mut selectable_string = |
-            //                             ui: &mut egui::Ui,
-            //                             element: String
-            //                         | {
-            //                             let info = information.clone();
-            //                             let currently_selected =
-            //                                 info.clone_from.is_some() &&
-            //                                 info.clone_from.unwrap() == element.clone();
-            //                             let mut response = ui.selectable_label(
-            //                                 currently_selected,
-            //                                 RichText::new(element.clone())
-            //                             );
-            //                             if response.clicked() && !currently_selected {
-            //                                 self.window_manager.set_window(EWindow::CloneSettings(CloneControlsData {
-            //                                     clone_to: info.clone_to,
-            //                                     clone_from: Some(element),
-            //                                 }), WindowSharedData {
-            //                                     configuration: Arc::clone(&self.configuration),
-            //                                     event_sender: self.event_manager.0.clone(),
-            //                                     accounts: self.accounts.clone()
-            //                                 });
-
-            //                                 response.mark_changed();
-            //                             }
-            //                             response
-            //                         };
-
-            //                         for account in self.accounts.clone() {
-            //                             if account != information.clone_to {
-            //                                 selectable_string(ui, account);
-            //                             }
-            //                         }
-            //                     });
-
-            //                 ui.label(RichText::new("to").font(font.clone()).color(TEXT_COLOR));
-
-            //                 ui.add(
-            //                     Label::new(
-            //                         RichText::new(information.clone_to)
-            //                             .color(TEXT_COLOR)
-            //                             .font(font.clone())
-            //                             .strong()
-            //                     )
-            //                 );
-            //             });
-
-            //             let is_account_selected = self.clone_configuration_information
-            //                 .clone()
-            //                 .unwrap()
-            //                 .clone_from.is_some();
-            //             ui.add_space(5.0);
-            //             centerer(ui, "_buttons", |ui| {
-            //                 ui.add_enabled_ui(is_account_selected, |ui| {
-            //                     if add_button(ui, "Copy", EColor::Primary).clicked() {
-            //                         let info = self.clone_configuration_information
-            //                             .clone()
-            //                             .unwrap();
-            //                         self.clone_settings(info.clone_from.unwrap(), info.clone_to);
-            //                     }
-            //                 });
-
-            //                 if add_button(ui, "Cancel", EColor::Delete).clicked() {
-            //                     self.clone_configuration_information = None;
-            //                 }
-            //             });
-            //         });
-            // }
-         
-            // if self.adding_account {
-            //     let text =
-            //         "Use this code to link your account to this application through epicgames.com/activate".to_string();
-            //     let font_id = FontId::new(14.0, egui::FontFamily::Name("Roboto".into()));
-
-            //     let text_size = ui
-            //         .painter()
-            //         .layout_no_wrap(text.clone(), font_id.clone(), TEXT_COLOR)
-            //         .size();
-
-            //     egui::Window
-            //         ::new("Add a new account")
-            //         .resizable(false)
-            //         .collapsible(false)
-            //         .movable(false)
-            //         .min_width(text_size.x)
-            //         .title_bar(false)
-            //         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
-            //         .show(ctx, |ui| {
-            //             ui.style_mut().spacing.item_spacing.y += 10.0;
-            //             ui.style_mut().spacing.window_margin.bottom += 10.0;
-            //             ui.style_mut().spacing.window_margin.top += 10.0;
-
-            //             if self.add_type == TokenType::DeviceCode {
-            //                 if !IS_ADDING_DEVICE_CODE_ACCOUNT.load(Ordering::Relaxed) {
-            //                     IS_ADDING_DEVICE_CODE_ACCOUNT.store(true, Ordering::Relaxed);
-            //                 }
-
-            //                 if let Some(data) = self.data.device_code_clone.clone() {
-            //                     ui.vertical_centered(|ui| {
-            //                         if
-            //                             ui
-            //                                 .add(
-            //                                     Label::new(
-            //                                         rich_montserrat_text(
-            //                                             data.user_code.clone(),
-            //                                             18.0
-            //                                         ).heading()
-            //                                     ).sense(Sense::click())
-            //                                 )
-            //                                 .on_hover_cursor(CursorIcon::PointingHand)
-            //                                 .clicked()
-            //                         {
-            //                             ui.output_mut(|x| {
-            //                                 x.copied_text = data.user_code.clone();
-            //                             });
-            //                         }
-            //                     });
-    
-            //                     ui.add(Label::new(RichText::new(text).color(TEXT_COLOR).font(font_id)));
-    
-            //                     centerer(ui, "_link_account", |ui| {
-            //                         if add_button(ui, "Link my account", EColor::Primary).clicked() {
-            //                             let url = data.verification_uri;
-            //                             ctx.open_url(OpenUrl { url, new_tab: true });
-            //                         }
-    
-            //                         if add_button(ui, "Cancel", EColor::Delete).clicked() {
-            //                             IS_ADDING_DEVICE_CODE_ACCOUNT.store(false, Ordering::Relaxed);
-            //                             self.data.device_code_clone = None;
-            //                             self.adding_account = false;
-            //                         }
-            //                     });
-            //                 } else {
-            //                     ui.vertical_centered(|ui| {
-            //                         ui.label(rich_montserrat_text("Please wait a second...", 15.0));
-            //                     });
-            //                 }
-            //             }
-
-            //             if self.advanced_mode {
-            //                 egui::ComboBox::from_label("Authentification method")
-            //                     .selected_text(format!("{:?}", self.add_type.to_string()))
-            //                     .show_ui(ui, |ui| {
-            //                         token_types().iter().for_each(|x| {
-            //                             ui.selectable_value(&mut self.add_type, *x, x.to_string());
-            //                         });
-            //                     }
-            //                 );
-
-            //                 match self.add_type {
-            //                     TokenType::RefreshToken => {
-            //                         ui.vertical_centered(|ui| {
-            //                             ui.add(Label::new(rich_montserrat_text("Add account with Refresh Token", 14.)));
-            //                         });
-
-            //                         ui.style_mut().visuals.extreme_bg_color = PRIMARY_COLOR;
-
-            //                         let mut s = String::new();
-            //                         ui.text_edit_singleline(&mut s);
-            //                     },
-            //                     TokenType::AuthorizationCode => todo!(),
-            //                     TokenType::ExchangeCode => todo!(),
-            //                     TokenType::DeviceCode => todo!(),
-            //                    _ => {}
-            //                 }
-            //             } else {
-            //                 self.add_type = TokenType::DeviceCode;
-            //             }
-            //         });
-            // }
-
-            // if self.current_window.is_some() {
-            //     self.current_window.as_mut().unwrap().render(ctx, ui);
-            // }
             self.window_manager.render(ctx, ui);
-
-            // if self.configuration_menu {
-            //     egui::Window
-            //     ::new("Configuration")
-            //     .resizable(false)
-            //     .collapsible(false)
-            //     .movable(false)
-            //     .title_bar(true)
-            //     .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
-            //     .show(ctx, |ui| {
-            //         ui.checkbox(&mut self.advanced_mode, "Advanced mode");
-
-            //         if ui.button("Close").clicked() {
-            //             self.configuration_menu = false;
-            //         }
-            //     });
-            // }
-            // ui.with_layout(Layout::right_to_left(Align::Max), |ui| {
-            //     ui.add(egui::Image
-            //         ::new(include_image!("../../assets/icons/gear.svg"))
-            //         .sense(Sense::click())
-            //         .tint(PRIMARY_COLOR)
-            //         .max_width(15.0));
-            // });
 
             //action menu at the bottom of the app
             ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
@@ -629,13 +303,14 @@ impl eframe::App for App {
                     let window_pos = ui.input(|i| { i.viewport().inner_rect }).unwrap();
 
                     let window_size = window_pos.max - window_pos.min;
+                    let svg_area = ((window_size.x * window_size.y) / 768.).sqrt().clamp(20., 30.);
 
                     let plus_max = Vec2 { 
                         x: window_size.x * 0.99, 
                         y: window_size.y * 0.991
                     };
 
-                    let plus_min = plus_max - Vec2 { x: 25.0, y: 25.0 };
+                    let plus_min = plus_max - Vec2 { x: svg_area, y: svg_area };
                     let vec_to_pos = |x: Vec2| -> Pos2 { Pos2 { x: x.x, y: x.y } };
 
         
@@ -644,16 +319,11 @@ impl eframe::App for App {
                         Image::new(include_image!("../../assets/icons/plus.svg"))
                         .sense(Sense::click())
                         .tint(PRIMARY_COLOR)
-                        .max_width(25.0)
+                        .max_width(svg_area)
                     );
 
                     if response.clicked() {
-                        // self.current_window = Some(Box::new(AddAccountWindow::new(ui, WindowSharedData {
-                        //     configuration: Arc::clone(&self.configuration),
-                        //     event_sender: self.event_manager.0.clone()
-                        // })));
-
-                        self.window_manager.set_window(EWindow::AddAccount, WindowSharedData {
+                        self.window_manager.set_window(WindowDescriptor { kind: EWindow::AddAccount, runtime_settings: self.runtime_settings.clone() }, WindowSharedData {
                             configuration: Arc::clone(&self.configuration),
                             event_sender: self.event_manager.0.clone(),
                             accounts: self.accounts.clone()
@@ -666,7 +336,7 @@ impl eframe::App for App {
                     };
 
 
-                     let configuration_min = configuration_max - Vec2 { x: 25.0, y: 25.0 };
+                     let configuration_min = configuration_max - Vec2 { x: svg_area, y: svg_area };
                      let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
 
 
@@ -675,22 +345,12 @@ impl eframe::App for App {
                         Image::new(include_image!("../../assets/icons/gear.svg"))
                         .sense(Sense::click())
                         .tint(PRIMARY_COLOR)
-                        .max_width(25.0))
+                        .max_width(svg_area))
                         .clicked() {
-                            self.toasts.add(
-                                Toast {
-                                    kind: ToastKind::Info,
-                                    text: egui::WidgetText::RichText(
-                                        RichText::new("This is not implemented yet")
-                                    ),
-                                    options: ToastOptions::default()
-                                        .duration_in_seconds(5.0)
-                                        .show_icon(true)
-                                        .show_progress(true),
-                                }
-                            );
-
-                            self.window_manager.set_window(EWindow::Settings, WindowSharedData {
+                            self.window_manager.set_window(WindowDescriptor {
+                                kind: EWindow::Settings,
+                                runtime_settings: self.runtime_settings.clone()
+                            }, WindowSharedData {
                                 configuration: self.configuration.clone(),
                                 accounts: self.accounts.clone(), 
                                 event_sender: self.event_manager.0.clone() 
