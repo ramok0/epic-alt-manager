@@ -1,11 +1,10 @@
-use std::sync::{atomic::{Ordering, AtomicBool}, Arc};
-use aes::cipher::typenum::P1;
+use std::sync::Arc;
 use tokio::sync::{mpsc::{Sender, Receiver}, Mutex};
 
-use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl, Order};
+use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl};
 use egui_toast::{Toast, ToastOptions};
 
-use crate::{gui::{window::{SubWindow, WindowSharedData, EWindow, WindowDescriptor}, gui_constants::TEXT_COLOR, gui_renderer::{App, AppDeviceAuthorization}, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError}, config::Configuration, egl::FORTNITE_NEW_SWITCH_GAME_CLIENT};
+use crate::{gui::{window::{SubWindow, WindowSharedData, WindowDescriptor}, gui_constants::TEXT_COLOR, gui_renderer::AppDeviceAuthorization, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError}, egl::FORTNITE_NEW_SWITCH_GAME_CLIENT};
 
 #[derive(Debug, Default, Clone)]
 pub struct CredentialsBuffer {
@@ -29,7 +28,7 @@ pub struct AddAccountWindow {
     pub exchange_code_buffer:CredentialsBuffer,
     pub device_auth_buffer:DeviceAuthBuffer,
     font:FontId,
-    add_type:TokenType,
+    _add_type:TokenType,
     device_code_clone:Option<DeviceAuthorization>,
     device_code_container: Arc<Mutex<Option<AppDeviceAuthorization>>>,
     device_code_communication: (Sender<AppDeviceAuthorization>, Receiver<AppDeviceAuthorization>),
@@ -140,7 +139,7 @@ impl SubWindow for AddAccountWindow {
             exchange_code_buffer:CredentialsBuffer::default(),
             device_auth_buffer:DeviceAuthBuffer::default(),
             font,
-            add_type: TokenType::DeviceCode,
+            _add_type: TokenType::DeviceCode,
 
             device_code_clone: None,
             device_code_container: Arc::new(Mutex::new(None)),

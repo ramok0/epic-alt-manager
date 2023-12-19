@@ -1,12 +1,11 @@
-use std::{sync::{ Arc, Mutex }, path::PathBuf, future};
+use std::{sync::{ Arc, Mutex }, path::PathBuf};
 
-use egui::{ Align2, Widget, FontSelection, TextStyle };
+use egui::{ Align2, Widget, FontSelection };
 use egui_toast::{Toast, ToastKind, ToastOptions};
 
 use crate::{
     gui::{window::{ SubWindow, WindowDescriptor }, gui_constants::TEXT_COLOR},
-    launchers::{ Launchers, self },
-    config::Configuration,
+    launchers::Launchers,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]

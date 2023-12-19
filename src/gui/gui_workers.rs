@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
-use eframe::EventLoopBuilder;
-
 use crate::{
     epic::EpicError,
-    process::{get_process_pid, kill_process}, config,
+    process::{get_process_pid, kill_process},
 };
 
 use super::{
     gui_renderer::App,
     gui_workers_proc::{
-        clone_settings_proc, link_egl_account_proc, remove_account_proc, swap_account_proc,
+        link_egl_account_proc, remove_account_proc, swap_account_proc,
     },
 };
 

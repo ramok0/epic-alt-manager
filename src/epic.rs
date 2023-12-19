@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::egl::{
-    epic_get_remember_me_data, RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2,
+    RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2,
 };
 
 use base64::{engine::general_purpose, Engine};
@@ -161,19 +161,19 @@ impl PartialEq for AccountDescriptor {
 }
 
 impl AccountDescriptor {
-    pub fn is_currently_used(&self) -> bool {
-        match epic_get_remember_me_data() {
-            Ok(data) => {
-             //   println!("Self : {}, Data : {}", self.display_name, data.display_name);
+    // pub fn is_currently_used(&self) -> bool {
+    //     match epic_get_remember_me_data() {
+    //         Ok(data) => {
+    //          //   println!("Self : {}, Data : {}", self.display_name, data.display_name);
 
-                return *self.display_name == data.display_name;
-            }
-            Err(error) => {
-                eprintln!("get_remember_me_data error : {}", error);
-                return false;
-            }
-        }
-    }
+    //             return *self.display_name == data.display_name;
+    //         }
+    //         Err(error) => {
+    //             eprintln!("get_remember_me_data error : {}", error);
+    //             return false;
+    //         }
+    //     }
+    // }
 
     pub async fn login_as_launcher(&self) -> Result<EpicAccount, EpicError> {
         let mut device_auth = self.device_auth.clone().ok_or(EpicError::new(
@@ -229,6 +229,7 @@ pub struct EULAData {
 pub enum EpicEula {
     Accepted,
     Pending(i64, String), //version, locale,
+    #[allow(dead_code)]
     None
 }
 
@@ -527,6 +528,7 @@ impl EpicAccount {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
     RefreshToken,
@@ -537,17 +539,17 @@ pub enum TokenType {
     None
 }
 
-pub fn token_types() -> [TokenType; 6] {
-    [
-        TokenType::RefreshToken,
-        TokenType::AuthorizationCode,
-        TokenType::ExchangeCode,
-        TokenType::DeviceAuth,
-        TokenType::DeviceCode,
-        TokenType::None
-    ]
+// pub fn token_types() -> [TokenType; 6] {
+//     [
+//         TokenType::RefreshToken,
+//         TokenType::AuthorizationCode,
+//         TokenType::ExchangeCode,
+//         TokenType::DeviceAuth,
+//         TokenType::DeviceCode,
+//         TokenType::None
+//     ]
 
-}
+// }
 
 impl Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -575,6 +577,7 @@ pub enum Token<'a> {
     DeviceCode(&'a str),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum EpicErrorKind {
     IoError,

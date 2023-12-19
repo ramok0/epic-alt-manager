@@ -1,9 +1,9 @@
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use egui_toast::Toast;
 use tokio::sync::{mpsc::Sender, Mutex, mpsc::Receiver};
 
-use super::{windows::{add_account::AddAccountWindow, clone_configuration::{CloneControlsData, CloneControlsWindow}, settings::RuntimeSettings}};
+use super::windows::{add_account::AddAccountWindow, clone_configuration::{CloneControlsData, CloneControlsWindow}, settings::RuntimeSettings};
 
 #[derive(PartialEq, Clone, Hash, Eq, Debug)]
 pub enum EWindow {
@@ -42,13 +42,12 @@ impl WindowManager {
             EWindow::AddAccount => {
                 self.current_window = Some((window.kind.clone(), Box::new(AddAccountWindow::new(shared_data, window.clone()))));
             },
-            EWindow::CloneSettings(info) => {
+            EWindow::CloneSettings(_info) => {
                 self.current_window = Some((window.kind.clone(), Box::new(CloneControlsWindow::new(shared_data, window.clone()))));
             },
             EWindow::Settings => {
                 self.current_window = Some((window.kind.clone(), Box::new(super::windows::settings::SettingsWindow::new(shared_data, window.clone()))));
             }
-            _ => {}
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::config::Configuration;
-use crate::egl::{ epic_get_remember_me_data };
+use crate::egl::epic_get_remember_me_data;
 use crate::epic::DeviceAuthorization;
 use egui_toast::{ Toast, ToastKind, ToastOptions, Toasts };
 

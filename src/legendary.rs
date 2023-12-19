@@ -10,6 +10,7 @@ struct Legendary {
 }
 
 impl Legendary {
+    #[allow(dead_code)]
     pub fn new(path:PathBuf) -> Self {
         Self {
             path

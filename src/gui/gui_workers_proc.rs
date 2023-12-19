@@ -1,7 +1,7 @@
 use egui::RichText;
 use egui_toast::{Toast, ToastKind, ToastOptions};
 use std::sync::Arc;
-use tokio::sync::{mpsc::Sender, Mutex};
+use tokio::sync::Mutex;
 
 use crate::{
     config::Configuration,
@@ -9,7 +9,7 @@ use crate::{
     epic::{AccountDescriptor, EpicError, EpicErrorKind},
 };
 
-use super::window::{EventManager, EventKind, EventSender};
+use super::window::{EventKind, EventSender};
 
 pub(crate) async fn link_egl_account_proc(
     configuration_mtx: Arc<Mutex<Configuration>>,

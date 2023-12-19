@@ -30,7 +30,7 @@ impl SubWindow for CloneControlsWindow {
         }
     }
 
-    fn create_window<'a>(&self, ui:&egui::Ui) -> egui::Window<'a> where Self:Sized {
+    fn create_window<'a>(&self, _ui:&egui::Ui) -> egui::Window<'a> where Self:Sized {
         egui::Window
         ::new("Clone controls")
         .resizable(false)
