@@ -168,18 +168,17 @@ impl eframe::App for App {
 
                     y_offset += text_size.y + ui.style().spacing.item_spacing.y;
 
-                    let mut rect_configuration = rect_text.clone();
+                    let mut rect_controls = rect_text.clone();
 
-                    rect_configuration.min.x =
-                        screen_center.x - ui.style().spacing.item_spacing.x - 15.0;
-                    rect_configuration.max.x = screen_center.x - ui.style().spacing.item_spacing.x;
-                    rect_configuration.min.y += 1.0;
-                    rect_configuration.max.y += 1.0;
+                    rect_controls.min.x = screen_center.x - ui.style().spacing.item_spacing.x - 15.0;
+                    rect_controls.max.x = screen_center.x - ui.style().spacing.item_spacing.x;
+                    rect_controls.min.y += 1.0;
+                    rect_controls.max.y += 1.0;
 
                     if
                         ui
                             .put(
-                                rect_configuration,
+                                rect_controls,
                                 egui::Image
                                     ::new(include_image!("../../assets/icons/clipboard.svg"))
                                     .sense(Sense::click())
@@ -278,52 +277,51 @@ impl eframe::App for App {
 
                     //afficher le bouton pour ajouter un compte
 
-                    let window_pos = ui.input(|i| { i.viewport().inner_rect }).unwrap();
-
-                    let window_size = window_pos.max - window_pos.min;
-                    let svg_area = ((window_size.x * window_size.y) / 768.).sqrt().clamp(20., 30.);
-
-                    let plus_max = Vec2 { 
-                        x: window_size.x * 0.99, 
-                        y: window_size.y * 0.991
-                    };
-
-                    let plus_min = plus_max - Vec2 { x: svg_area, y: svg_area };
-                    let vec_to_pos = |x: Vec2| -> Pos2 { Pos2 { x: x.x, y: x.y } };
-
-        
-                    let response = ui.put(
-                        egui::Rect { min: vec_to_pos(plus_min), max: vec_to_pos(plus_max) },
-                        Image::new(include_image!("../../assets/icons/plus.svg"))
-                        .sense(Sense::click())
-                        .tint(PRIMARY_COLOR)
-                        .max_width(svg_area)
-                    );
-
-                    if response.clicked() {
-                        self.set_window(EWindow::AddAccount);
-                    }
-
-                    let configuration_max = Vec2 {
-                        x: plus_min.x * 0.98,
-                        y: plus_max.y-1.
-                    };
-
-
-                     let configuration_min = configuration_max - Vec2 { x: svg_area, y: svg_area };
-                     let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
-
-
-                    if ui.put(
-                        configuration_rect,
-                        Image::new(include_image!("../../assets/icons/gear.svg"))
-                        .sense(Sense::click())
-                        .tint(PRIMARY_COLOR)
-                        .max_width(svg_area))
-                        .clicked() {
-                            self.set_window(EWindow::Settings);
+                    if let Some(window_pos) = ui.input(|i| { i.viewport().inner_rect }) {
+                        let window_size = window_pos.max - window_pos.min;
+                        let svg_area = ((window_size.x * window_size.y) / 768.).sqrt().clamp(20., 30.);
+    
+                        let plus_max = Vec2 { 
+                            x: window_size.x * 0.99, 
+                            y: window_size.y * 0.991
+                        };
+    
+                        let plus_min = plus_max - Vec2 { x: svg_area, y: svg_area };
+                        let vec_to_pos = |x: Vec2| -> Pos2 { Pos2 { x: x.x, y: x.y } };
+    
+            
+                        let response = ui.put(
+                            egui::Rect { min: vec_to_pos(plus_min), max: vec_to_pos(plus_max) },
+                            Image::new(include_image!("../../assets/icons/plus.svg"))
+                            .sense(Sense::click())
+                            .tint(PRIMARY_COLOR)
+                            .max_width(svg_area)
+                        );
+    
+                        if response.clicked() {
+                            self.set_window(EWindow::AddAccount);
                         }
-                
+    
+                        let configuration_max = Vec2 {
+                            x: plus_min.x * 0.98,
+                            y: plus_max.y-1.
+                        };
+    
+    
+                         let configuration_min = configuration_max - Vec2 { x: svg_area, y: svg_area };
+                         let configuration_rect = egui::Rect {min: vec_to_pos(configuration_min), max: vec_to_pos(configuration_max)};
+    
+    
+                        if ui.put(
+                            configuration_rect,
+                            Image::new(include_image!("../../assets/icons/gear.svg"))
+                            .sense(Sense::click())
+                            .tint(PRIMARY_COLOR)
+                            .max_width(svg_area))
+                            .clicked() {
+                                self.set_window(EWindow::Settings);
+                            }
+                    }                
             });
         });
     }
