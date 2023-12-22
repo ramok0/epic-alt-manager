@@ -32,7 +32,7 @@ impl AuthClient<'_> {
         ]
     }
 
-    pub fn get(id:&str) -> Option<AuthClient<'static>> {
-        AuthClient::clients().into_iter().find(|client| client.id == id)
+    pub fn get(name:&str) -> Option<AuthClient<'static>> {
+        AuthClient::clients().into_iter().find(|client| client.name == name)
     }
 }
