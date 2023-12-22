@@ -101,7 +101,7 @@ impl Configuration {
 
     fn read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let configuration_path = Configuration::get_path();
-        dbg!(&configuration_path);
+
         if Configuration::exists() {
             let data_str = std::fs::read_to_string(configuration_path)?;
             let data: Configuration = serde_json::from_str(&data_str)?;
