@@ -29,7 +29,7 @@ use super::gui_helper::{
     EColor,
     get_montserrat_font,
 };
-use super::window::{WindowSharedData, EventManager, EventKind, EWindow, WindowManager, WindowDescriptor};
+use super::window::{EventManager, EventKind, EWindow, WindowManager};
 use super::windows::clone_configuration::CloneControlsData;
 use super::windows::settings::RuntimeSettings;
 
@@ -61,16 +61,16 @@ pub struct App {
     pub(crate) accounts: Vec<String>,
     pub(crate) current_account: Option<String>,
     pub runtime_settings:Arc<std::sync::Mutex<RuntimeSettings>>,
-    window_manager: WindowManager,
+    pub(crate) window_manager: WindowManager,
     pub event_manager: EventManager,
 }
 
-impl App {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+impl Default for App {
+    fn default() -> Self {
         let configuration = Configuration::new().expect("Failed to load configuration");
         let accounts = configuration.accounts.clone();
 
-        let mut app = Self {
+        Self {
             configuration: Arc::new(Mutex::new(configuration)),
             accounts: accounts
                 .iter()
@@ -83,17 +83,16 @@ impl App {
             runtime_settings: Arc::new(std::sync::Mutex::new(RuntimeSettings { advanced_mode: false })),
             event_manager: tokio::sync::mpsc::channel(std::mem::size_of::<EventKind>()),
             window_manager: WindowManager::new()
-        };
+        }
+    }
+}
 
-        if accounts.len() == 0 {
-            app.window_manager.set_window(WindowDescriptor {
-                kind: EWindow::AddAccount,
-                runtime_settings: Arc::clone(&app.runtime_settings)
-            }, WindowSharedData {
-                configuration: Arc::clone(&app.configuration),
-                event_sender: app.event_manager.0.clone(),
-                accounts: app.accounts.clone()
-            });
+impl App {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        let mut app = App::default();
+
+        if app.accounts.len() == 0 {
+            app.set_window(EWindow::AddAccount);
         }
 
         match epic_get_remember_me_data() {
@@ -190,17 +189,10 @@ impl eframe::App for App {
                             .on_hover_cursor(CursorIcon::PointingHand)
                             .clicked()
                     {
-                        self.window_manager.set_window(WindowDescriptor {
-                            kind: EWindow::CloneSettings(CloneControlsData {
-                                clone_from: None,
-                                clone_to: account.clone(),
-                            }),
-                            runtime_settings: self.runtime_settings.clone()
-                        }, WindowSharedData {
-                                    configuration: Arc::clone(&self.configuration),
-                                    event_sender: self.event_manager.0.clone(),
-                                    accounts: self.accounts.clone()
-                             });
+                        self.set_window(EWindow::CloneSettings(CloneControlsData {
+                            clone_from: None,
+                            clone_to: account.clone(),
+                        }));
                     }
 
                     if
@@ -309,11 +301,7 @@ impl eframe::App for App {
                     );
 
                     if response.clicked() {
-                        self.window_manager.set_window(WindowDescriptor { kind: EWindow::AddAccount, runtime_settings: self.runtime_settings.clone() }, WindowSharedData {
-                            configuration: Arc::clone(&self.configuration),
-                            event_sender: self.event_manager.0.clone(),
-                            accounts: self.accounts.clone()
-                        });
+                        self.set_window(EWindow::AddAccount);
                     }
 
                     let configuration_max = Vec2 {
@@ -333,14 +321,7 @@ impl eframe::App for App {
                         .tint(PRIMARY_COLOR)
                         .max_width(svg_area))
                         .clicked() {
-                            self.window_manager.set_window(WindowDescriptor {
-                                kind: EWindow::Settings,
-                                runtime_settings: self.runtime_settings.clone()
-                            }, WindowSharedData {
-                                configuration: self.configuration.clone(),
-                                accounts: self.accounts.clone(), 
-                                event_sender: self.event_manager.0.clone() 
-                             });
+                            self.set_window(EWindow::Settings);
                         }
                 
             });

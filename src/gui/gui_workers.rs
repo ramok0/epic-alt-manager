@@ -9,7 +9,7 @@ use super::{
     gui_renderer::App,
     gui_workers_proc::{
         link_egl_account_proc, remove_account_proc, swap_account_proc,
-    }, window::EventKind,
+    }, window::{EventKind, EWindow, WindowSharedData, WindowDescriptor},
 };
 
 impl App {
@@ -27,6 +27,14 @@ impl App {
                 },
             }
         }
+    }
+
+    pub fn set_window(&mut self, kind:EWindow) {
+        self.window_manager.set_window(WindowDescriptor { kind: kind, runtime_settings: self.runtime_settings.clone() }, WindowSharedData {
+            configuration: Arc::clone(&self.configuration),
+            event_sender: self.event_manager.0.clone(),
+            accounts: self.accounts.clone()
+        });
     }
 
     pub fn link_egl_account(&self) {
