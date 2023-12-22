@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::egl::{
-    RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2,
-};
+use crate::{egl::{
+    RememberMeEntry,
+}, epic_clients::AuthClient, get_client};
 
 use base64::{engine::general_purpose, Engine};
 use egui_toast::{Toast, ToastOptions};
@@ -142,7 +142,7 @@ impl DeviceAuth {
             )
         })?;
         let response =
-            crate::epic::token(Token::DeviceAuth(&self), FORTNITE_IOS_GAME_CLIENT).await?;
+            crate::epic::token(Token::DeviceAuth(&self), get_client!("fortniteIOSGameClient")).await?;
 
         Ok(response)
     }
@@ -182,8 +182,8 @@ impl AccountDescriptor {
         ))?;
 
         device_auth.uncipher_secret()?;
-        let account = token(Token::DeviceAuth(&device_auth), FORTNITE_IOS_GAME_CLIENT).await?;
-        let account = account.exchange_to(LAUNCHER_APP_CLIENT_2).await?;
+        let account = token(Token::DeviceAuth(&device_auth), get_client!("fortniteIOSGameClient")).await?;
+        let account = account.exchange_to(get_client!("launcherAppClient2")).await?;
         Ok(account)
     }
 }
@@ -502,9 +502,9 @@ impl EpicAccount {
         Ok(data.code)
     }
 
-    pub async fn exchange_to(
+    pub async fn exchange_to<'a>(
         &self,
-        client: (&'static str, &'static str),
+        client: AuthClient<'a>,
     ) -> Result<EpicAccount, EpicError> {
         let exchange_code = self.exchange_code().await?;
         let account = token(Token::ExchangeCode(&exchange_code), client).await?;
@@ -539,17 +539,16 @@ pub enum TokenType {
     None
 }
 
-// pub fn token_types() -> [TokenType; 6] {
-//     [
-//         TokenType::RefreshToken,
-//         TokenType::AuthorizationCode,
-//         TokenType::ExchangeCode,
-//         TokenType::DeviceAuth,
-//         TokenType::DeviceCode,
-//         TokenType::None
-//     ]
+pub fn token_types() -> [TokenType; 5] {
+     [
+         TokenType::RefreshToken,
+         TokenType::AuthorizationCode,
+         TokenType::ExchangeCode,
+         TokenType::DeviceAuth,
+         TokenType::DeviceCode
+     ]
 
-// }
+}
 
 impl Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -671,7 +670,7 @@ type EpicResult<T> = Result<T, EpicError>;
 
 pub async fn token<'a>(
     token: Token<'a>,
-    client: (&'static str, &'static str),
+    client: AuthClient<'a>,
 ) -> Result<EpicAccount, EpicError> {
     let mut params = HashMap::new();
 
@@ -710,7 +709,7 @@ pub async fn token<'a>(
     let response = CLIENT
         .post(TOKEN)
         .form(&params)
-        .basic_auth(client.0, Some(client.1))
+        .basic_auth(client.id, Some(client.secret))
         .send()
         .await
         .map_err(|_| EpicError::reqwest_internal_error())?;

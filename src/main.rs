@@ -15,6 +15,7 @@ mod process;
 mod version;
 mod legendary;
 mod launchers;
+mod epic_clients;
 
 use eframe::{egui, NativeOptions};
 use tokio::runtime::Runtime;

@@ -1,6 +1,6 @@
 use crate::{
-    egl::{RememberMeEntry, FORTNITE_IOS_GAME_CLIENT, LAUNCHER_APP_CLIENT_2},
-    epic::{self, AccountDescriptor, EpicAccount}, launchers::Launchers,
+    egl::RememberMeEntry,
+    epic::{self, AccountDescriptor, EpicAccount}, launchers::Launchers, get_client,
 };
 use std::{
     fmt::Display,
@@ -30,6 +30,7 @@ pub enum AddAccountProvider<'a> {
     EpicAccount(&'a EpicAccount),
 }
 
+#[derive(Debug, Clone)]
 pub enum AddAccountError {
     FailedToExchange,
     InvalidResponse,
@@ -169,12 +170,12 @@ impl Configuration {
                 */
                 let account = epic::token(
                     epic::Token::RefreshToken(&entry.token),
-                    LAUNCHER_APP_CLIENT_2,
+                    get_client!("launcherAppClient2"),
                 )
                 .await
                 .map_err(|_| AddAccountError::FailedToLogin)?;
 
-                let account = match account.exchange_to(FORTNITE_IOS_GAME_CLIENT).await {
+                let account = match account.exchange_to(get_client!("fortniteIOSGameClient")).await {
                     Ok(data) => Ok(data),
                     Err(_) => Err(AddAccountError::FailedToExchange),
                 }?;
@@ -206,9 +207,11 @@ impl Configuration {
 
                 let mut account = account.clone();
 
-                if account.client_id != FORTNITE_IOS_GAME_CLIENT.0 {
+                let fortnite_ios_game_client = get_client!("fortniteIOSGameClient");
+
+                if account.client_id != fortnite_ios_game_client.id {
                     account = account
-                        .exchange_to(FORTNITE_IOS_GAME_CLIENT)
+                        .exchange_to(fortnite_ios_game_client)
                         .await
                         .map_err(|_| AddAccountError::FailedToExchange)?;
                 }
