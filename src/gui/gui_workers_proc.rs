@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use crate::{
     config::Configuration,
     egl::{self, epic_get_remember_me_data},
-    epic::{AccountDescriptor, EpicError, EpicErrorKind},
+    epic::{AccountDescriptor, EpicError, EpicErrorKind}, process::kill_epic_games_launcher,
 };
 
 use super::window::{EventKind, EventSender};
@@ -144,9 +144,13 @@ pub(crate) async fn swap_account_proc(
     let remember_me_entry = infos.to_remember_me_entry(&account.refresh_token.unwrap());
     let _ = egl::epic_set_remember_me_data(remember_me_entry)?;
 
+    if configuration.close_epic_games_launcher_on_swap {
+        let _ = kill_epic_games_launcher();
+    }
+
     Ok(Toast {
         text: RichText::new(format!(
-            "Swapped to {} successfully, restart EpicGamesLauncher to apply changes",
+            "Logged in as {} !",
             descriptor.display_name.clone()
         ))
         .into(),

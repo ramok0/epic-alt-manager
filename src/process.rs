@@ -35,3 +35,13 @@ pub unsafe fn kill_process(pid: u32) -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+pub fn kill_epic_games_launcher() -> Result<(), Box<dyn std::error::Error>> {
+    unsafe {
+        let pid = get_process_pid("EpicGamesLauncher.exe".to_string())?;
+
+        kill_process(pid)?;
+    }
+
+    Ok(())
+}
