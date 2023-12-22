@@ -19,6 +19,7 @@ pub struct SettingsWindow {
     clone_legendary_path: String,
     should_close: bool,
     shared_data: crate::gui::window::WindowSharedData,
+    pub close_epic_games_launcher_on_swap_clone:bool
 }
 
 impl SubWindow for SettingsWindow {
@@ -31,12 +32,14 @@ impl SubWindow for SettingsWindow {
         let lock = shared_data.configuration.clone().blocking_lock_owned();
          let current_launcher = &lock.launcher;
          let current_legendary_path = &lock.legendary_path;
+         let current_close_epic_games_launcher_on_swap_clone = lock.close_epic_games_launcher_on_swap;
         SettingsWindow {
             shared_data: shared_data,
             runtime_settings: window_descriptor.runtime_settings,
             should_close: false,
             clone_launcher: current_launcher.clone(),
             clone_legendary_path: current_legendary_path.to_owned(),
+            close_epic_games_launcher_on_swap_clone:current_close_epic_games_launcher_on_swap_clone
         }
     }
 
@@ -62,6 +65,12 @@ impl SubWindow for SettingsWindow {
             let mut runtime_settings = self.runtime_settings.lock().unwrap();
 
             ui.checkbox(&mut runtime_settings.advanced_mode, "Advanced mode");
+
+            if ui.checkbox(&mut self.close_epic_games_launcher_on_swap_clone, "Close EpicGames on swap").changed() {
+                //replicate to configuration
+                let mut configuration = self.shared_data.configuration.blocking_lock();
+                configuration.close_epic_games_launcher_on_swap = self.close_epic_games_launcher_on_swap_clone;
+            }
 
             egui::ComboBox
                 ::from_label("Launcher")
@@ -89,7 +98,7 @@ impl SubWindow for SettingsWindow {
             let response = egui::TextEdit::singleline(&mut self.clone_legendary_path)
             .desired_width(text_size.x + 35.)
             .ui(ui)
-            .on_hover_text("Legendary Configuration Path");
+            .on_hover_text("Legendary Configuration Path (not implemented)");
 
             if response.double_clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_folder() {

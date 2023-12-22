@@ -6,6 +6,12 @@ pub enum Launchers {
     Legendary
 }
 
+impl Default for Launchers {
+    fn default() -> Self {
+        Launchers::EpicGamesLauncher
+    }
+}  
+
 pub fn launchers() -> [Launchers; 2] {
     [Launchers::EpicGamesLauncher, Launchers::Legendary]
 

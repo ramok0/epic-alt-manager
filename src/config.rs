@@ -9,11 +9,21 @@ use std::{
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct Configuration {
+    #[serde(default)]
     pub accounts: Vec<AccountDescriptor>,
+    #[serde(default)]
     pub launcher:Launchers,
+    #[serde(default)]
     pub legendary_path:String,
-    pub version:String
+    #[serde(default = "default_version")]
+    pub version:String,
+    #[serde(default)]
+    pub close_epic_games_launcher_on_swap:bool
 }
+
+fn default_version() -> String {
+    crate::version::get_program_version().to_string()
+}  
 
 pub enum AddAccountProvider<'a> {
     RememberMeEntry(&'a RememberMeEntry),
@@ -52,7 +62,7 @@ impl Configuration {
         Ok(configuration)
     }
 
-    fn update(&mut self) {
+    fn upgrade(&mut self) {
         let version = self.version.to_string();
         println!("version : {}", version);
         match version.as_str() {
@@ -97,6 +107,7 @@ impl Configuration {
         self.launcher = data.launcher.clone();
         self.legendary_path = data.legendary_path.clone();
         self.version = data.version.clone();
+        self.close_epic_games_launcher_on_swap = data.close_epic_games_launcher_on_swap;
     }
 
     fn read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -109,7 +120,7 @@ impl Configuration {
             self.apply_values(&data);
 
             if data.version != crate::version::get_program_version() {
-                self.update();
+                self.upgrade();
             }
         } else {
             let data = Self::default();
@@ -235,7 +246,8 @@ impl Default for Configuration {
             accounts: Vec::new(),
             launcher: Launchers::EpicGamesLauncher,
             legendary_path:String::new(),
-            version: crate::version::get_program_version().to_string()
+            version: crate::version::get_program_version().to_string(),
+            close_epic_games_launcher_on_swap: false
         }
     }
 }
