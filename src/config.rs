@@ -75,7 +75,17 @@ impl Configuration {
     }
 
     fn get_path() -> PathBuf {
-        std::path::PathBuf::from("config.json")
+        if let Ok(program_data_path_str) = std::env::var("PROGRAMDATA") {
+            let folder_path = PathBuf::from(program_data_path_str).join("AltManager");
+
+            if !folder_path.exists() {
+                std::fs::create_dir_all(&folder_path).unwrap();
+            }
+
+            folder_path.join("config.json")
+        } else {
+            std::path::PathBuf::from("config.json")
+        }
     }
 
     fn exists() -> bool {
@@ -90,11 +100,10 @@ impl Configuration {
     }
 
     fn read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-
-
-        let path_buf = Configuration::get_path();
+        let configuration_path = Configuration::get_path();
+        dbg!(&configuration_path);
         if Configuration::exists() {
-            let data_str = std::fs::read_to_string(path_buf)?;
+            let data_str = std::fs::read_to_string(configuration_path)?;
             let data: Configuration = serde_json::from_str(&data_str)?;
 
             self.apply_values(&data);
