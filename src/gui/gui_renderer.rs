@@ -58,8 +58,8 @@ impl AppDeviceAuthorization {
 pub struct App {
     pub configuration: Arc<Mutex<Configuration>>,
     pub toasts: Toasts,
-    accounts: Vec<String>,
-    current_account: Option<String>,
+    pub(crate) accounts: Vec<String>,
+    pub(crate) current_account: Option<String>,
     pub runtime_settings:Arc<std::sync::Mutex<RuntimeSettings>>,
     window_manager: WindowManager,
     pub event_manager: EventManager,
@@ -118,23 +118,9 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.toasts.show(ctx);
-
-        if let Ok(event) = self.event_manager.1.try_recv() {
-            match event {
-                EventKind::Accounts(accounts) => {
-                    self.accounts = accounts;
-                },
-                EventKind::AddToast(toast) => {
-                    self.toasts.add(toast);
-                },
-                EventKind::CurrentAccount(account) => {
-                    self.current_account = account;
-                },
-            }
-        }
+        self.handle_events();
 
         egui::CentralPanel::default().show(ctx, |ui| {
-
             //disable window controls if a subwindow is opened and should render
             let should_disable = self.window_manager.current_window.is_some() && self.window_manager.current_window.as_ref().unwrap().1.should_appear();
             ui.set_enabled(!should_disable);

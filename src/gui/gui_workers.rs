@@ -9,10 +9,26 @@ use super::{
     gui_renderer::App,
     gui_workers_proc::{
         link_egl_account_proc, remove_account_proc, swap_account_proc,
-    },
+    }, window::EventKind,
 };
 
 impl App {
+    pub fn handle_events(&mut self) {
+        if let Ok(event) = self.event_manager.1.try_recv() {
+            match event {
+                EventKind::Accounts(accounts) => {
+                    self.accounts = accounts;
+                },
+                EventKind::AddToast(toast) => {
+                    self.toasts.add(toast);
+                },
+                EventKind::CurrentAccount(account) => {
+                    self.current_account = account;
+                },
+            }
+        }
+    }
+
     pub fn link_egl_account(&self) {
         let event_sender = self.event_manager.0.clone();
         let configuration_mtx = Arc::clone(&self.configuration);
