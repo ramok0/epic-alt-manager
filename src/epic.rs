@@ -1,8 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{egl::{
-    RememberMeEntry,
-}, epic_clients::AuthClient, get_client};
+use crate::{egl::RememberMeEntry, epic_clients::AuthClient, get_client};
 
 use base64::{engine::general_purpose, Engine};
 use egui_toast::{Toast, ToastOptions};

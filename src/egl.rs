@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::epic_clients::AuthClient;
+
 use crate::{
     decrypt,
     epic::{EpicError, EpicErrorKind},

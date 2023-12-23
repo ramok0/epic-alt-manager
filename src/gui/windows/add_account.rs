@@ -1,10 +1,10 @@
 use std::sync::Arc;
 use tokio::sync::{mpsc::{Sender, Receiver}, Mutex};
 
-use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl, ComboBox, CentralPanel, Button};
+use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl, ComboBox};
 use egui_toast::{Toast, ToastOptions};
 
-use crate::{gui::{window::{SubWindow, WindowSharedData, WindowDescriptor, EventKind, EventSender}, gui_constants::TEXT_COLOR, gui_renderer::AppDeviceAuthorization, gui_helper::{rich_montserrat_text, centerer, add_button, EColor, create_button}}, epic::{TokenType, DeviceAuthorization, self, EpicError, token_types, DeviceAuth, Token}, epic_clients::{self, AuthClient}, get_client};
+use crate::{gui::{window::{SubWindow, WindowSharedData, WindowDescriptor, EventKind, EventSender}, gui_constants::TEXT_COLOR, gui_renderer::AppDeviceAuthorization, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError, token_types, DeviceAuth, Token}, epic_clients::{self, AuthClient}, get_client};
 
 #[derive(Debug, Default, Clone)]
 pub struct CredentialsBuffer {

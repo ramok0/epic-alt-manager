@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-
 use egui::{Button, FontId, Response, RichText};
 
 use super::gui_constants::{
