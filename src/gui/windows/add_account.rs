@@ -4,7 +4,7 @@ use tokio::sync::{mpsc::{Sender, Receiver}, Mutex};
 use egui::{FontId, Align2, CursorIcon, Sense, Label, RichText, OpenUrl, ComboBox, CentralPanel, Button};
 use egui_toast::{Toast, ToastOptions};
 
-use crate::{gui::{window::{SubWindow, WindowSharedData, WindowDescriptor, EventKind, EventSender}, gui_constants::TEXT_COLOR, gui_renderer::AppDeviceAuthorization, gui_helper::{rich_montserrat_text, centerer, add_button, EColor}}, epic::{TokenType, DeviceAuthorization, self, EpicError, token_types, DeviceAuth, Token}, epic_clients::{self, AuthClient}, get_client};
+use crate::{gui::{window::{SubWindow, WindowSharedData, WindowDescriptor, EventKind, EventSender}, gui_constants::TEXT_COLOR, gui_renderer::AppDeviceAuthorization, gui_helper::{rich_montserrat_text, centerer, add_button, EColor, create_button}}, epic::{TokenType, DeviceAuthorization, self, EpicError, token_types, DeviceAuth, Token}, epic_clients::{self, AuthClient}, get_client};
 
 #[derive(Debug, Default, Clone)]
 pub struct CredentialsBuffer {
@@ -198,47 +198,51 @@ impl SubWindow for AddAccountWindow {
                         ui.add(Label::new(rich_montserrat_text("Add account with Device Auth", 18.)))
                     });
 
-                    ui.vertical_centered(|ui| {
-                        centerer(ui, "_account_id", |ui| {
-                            ui.text_edit_singleline(&mut self.device_auth_buffer.account_id);
-                            ui.label("Account Id");
-                        });
+                    centerer(ui, "_device_id", |ui| {
+                        ui.text_edit_singleline(&mut self.device_auth_buffer.device_id);
+                        ui.label("Device Id");
+                    });
 
-                        centerer(ui, "_device_id", |ui| {
-                            ui.text_edit_singleline(&mut self.device_auth_buffer.device_id);
-                            ui.label("Device Id");
-                        });
+                    centerer(ui, "_account_id", |ui| {
+                        ui.text_edit_singleline(&mut self.device_auth_buffer.account_id);
+                        ui.label("Account Id");
+                    });
 
-                        centerer(ui, "_secret", |ui| {
-                            ui.text_edit_singleline(&mut self.device_auth_buffer.secret);
-                            ui.label("Secret");
-                        });
+                    centerer(ui, "_secret", |ui| {
+                        ui.text_edit_singleline(&mut self.device_auth_buffer.secret);
+                        ui.label("Secret");
+                    });
 
-                        let mut clients = epic_clients::AuthClient::clients();
-                        clients.sort_by(|a, b| b.name.len().cmp(&a.name.len()));
+                    let mut clients = epic_clients::AuthClient::clients();
+                    clients.sort_by(|a, b| b.name.len().cmp(&a.name.len()));
 
-                        let client_selector_size = ui.painter().layout_no_wrap(clients.first().unwrap().name.to_string(), FontId::monospace(14.), ui.style().visuals.text_color()).size();
-                        
-                        centerer( ui, "_client_selector", |ui| {
-                            ComboBox::from_label("Client")
-                            .selected_text(self.device_auth_buffer.client.map(|x| x.name).unwrap_or("Select a client"))
-                            .width(client_selector_size.x)
-                            .show_ui(ui, |ui| {
-                                clients.iter().for_each(|client| {
-                                    if ui.selectable_label(self.device_auth_buffer.client == Some(*client), client.name).clicked() {
-                                        self.device_auth_buffer.client = Some(*client);
-                                    }
-                                });
+                    let client_selector_size = ui.painter().layout_no_wrap(clients.first().unwrap().name.to_string(), FontId::monospace(14.), ui.style().visuals.text_color()).size();
+                    
+                    centerer( ui, "_client_selector", |ui| {
+                        ComboBox::from_label("Client")
+                        .selected_text(self.device_auth_buffer.client.map(|x| x.name).unwrap_or("Select a client"))
+                        .width(client_selector_size.x)
+                        .show_ui(ui, |ui| {
+                            clients.iter().for_each(|client| {
+                                if ui.selectable_label(self.device_auth_buffer.client == Some(*client), client.name).clicked() {
+                                    self.device_auth_buffer.client = Some(*client);
+                                }
                             });
                         });
+                    });
 
-                        let clickable = !self.device_auth_buffer.account_id.is_empty()
-                        && !self.device_auth_buffer.device_id.is_empty()
-                        && !self.device_auth_buffer.secret.is_empty()
-                        && self.device_auth_buffer.client.is_some();
 
-                        centerer(ui, "_actions", |ui| {
-                            if ui.add_enabled(clickable, Button::new("Add Account")).clicked() {
+
+                    let clickable = !self.device_auth_buffer.account_id.is_empty()
+                    && !self.device_auth_buffer.device_id.is_empty()
+                    && !self.device_auth_buffer.secret.is_empty()
+                    && self.device_auth_buffer.client.is_some();
+
+                    centerer(ui, "_actions", |ui| {
+
+                        ui.scope(|ui| {
+                            ui.set_enabled(clickable);
+                            if add_button(ui, "Add Account", EColor::Primary).clicked() {
                                 let buffer = self.device_auth_buffer.clone();
                                 let event_sender = self.shared_data.event_sender.clone();
                                 let configuration_mtx = self.shared_data.configuration.clone();
@@ -252,11 +256,11 @@ impl SubWindow for AddAccountWindow {
                                     let _ = add_account_proc(Token::DeviceAuth(&device_auth), buffer.client.unwrap(), event_sender, configuration_mtx).await;
                                 });
                             }
-
-                            if add_button(ui, "Close", EColor::Delete).clicked() {    
-                                self.close();
-                            }
                         });
+
+                        if add_button(ui, "Close",  EColor::Delete).clicked() {    
+                            self.close();
+                        }
                     });
                 },
                 TokenType::DeviceCode => {
@@ -289,7 +293,7 @@ impl SubWindow for AddAccountWindow {
                                 ctx.open_url(OpenUrl { url, new_tab: true });
                             }
         
-                            if add_button(ui, "Close", EColor::Delete).clicked() {
+                            if add_button(ui, "Close",  EColor::Delete).clicked() {
                                 self.close();
                             }
                         });

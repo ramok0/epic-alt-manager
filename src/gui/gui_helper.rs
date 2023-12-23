@@ -1,3 +1,5 @@
+use std::f32::consts::E;
+
 use egui::{Button, FontId, Response, RichText};
 
 use super::gui_constants::{
@@ -32,6 +34,7 @@ pub fn add_button(ui: &mut egui::Ui, text: impl Into<String>, color: EColor) -> 
             ui.style_mut().visuals.widgets.hovered.weak_bg_fill = DELETE_COLOR_HOVER;
         }
     }
+
     ui.add_sized(BUTTON_MAX_SIZE, create_button(text))
 }
 

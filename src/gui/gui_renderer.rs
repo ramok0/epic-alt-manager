@@ -255,7 +255,7 @@ impl eframe::App for App {
                     }
                 }
 
-                if add_button(ui, "Kill EGL", EColor::Primary).clicked() {
+                if add_button(ui, "Kill EGL",  EColor::Primary).clicked() {
                     let result = Self::kill_epic_games_launcher().map(|_| {
                         Toast {
                             kind: ToastKind::Success,

@@ -103,7 +103,7 @@ impl SubWindow for CloneControlsWindow {
             ui.add_space(5.0);
             centerer(ui, "_buttons", |ui| {
                 ui.add_enabled_ui(is_account_selected, |ui| {
-                    if add_button(ui, "Copy", EColor::Primary).clicked() {
+                    if add_button(ui, "Copy",  EColor::Primary).clicked() {
                         let info = self.information.clone();
 
                         let configuration_mtx = self.shared_data.configuration.clone();
